@@ -102,13 +102,13 @@ components.html(f"""
     letter-spacing: 0.02em;
     line-height: 1.6;
     margin-bottom: 3rem;
-    animation: fadeUp 1.6s ease-out 2.0s both;
+    animation: fadeUp 1.6s ease-out 1.0s both;
   }}
 
   /* ── PLAYER BLOCK (track info + audio) ── */
   .player-block {{
     width: 100%;
-    animation: fadeUp 1.4s ease-out 3.5s both;
+    animation: fadeUp 1.4s ease-out 1.5s both;
   }}
 
   /* ── DIVIDER ── */
@@ -149,7 +149,7 @@ components.html(f"""
     color: #C0B8B0;
     letter-spacing: 1.6em;
     text-transform: uppercase;
-    animation: fadeUp 1.2s ease-out 4.0s both;
+    animation: fadeUp 1.2s ease-out 2.0s both;
   }}
 
 </style>
