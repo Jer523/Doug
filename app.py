@@ -181,4 +181,4 @@ components.html(f"""
       </script>
 </body>
 </html>
-""", height=1200, scrolling=False)
+""", height=500, scrolling=False)
