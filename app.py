@@ -109,7 +109,7 @@ components.html(f"""
     width:100%;
     max-width:270px;
     /* align with the progress bar: skip the button width + gap */
-    padding-left: calc(5px + 36px + 9px); /* player padding-left + btn width + gap */
+    padding-left: calc(5px + 36px + 14px); /* player padding-left + btn width + gap */
     margin:0 auto 10px auto;
     box-sizing:border-box;
   }}
@@ -126,7 +126,7 @@ components.html(f"""
     margin:0 auto;
     display:flex;
     align-items:center;
-    gap:24px;          /* ← increased from 14px */
+    gap:14px;          /* ← increased from 14px */
     padding-left:5px; /* ← shift button right */
   }}
 
