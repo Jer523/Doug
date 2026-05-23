@@ -9,19 +9,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-st.markdown("""
-<style>
-html, body, [data-testid="stAppViewContainer"],
-[data-testid="stAppViewBlockContainer"],
-.main, .block-container,
-iframe, [data-testid="stIFrame"] {
-    background-color: #FDFBF7 !important;
-    color-scheme: light !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
-
 # ─────────────────────────────────────────────
 #  AUDIO
 # ─────────────────────────────────────────────
@@ -34,57 +21,65 @@ if os.path.exists(AUDIO_PATH):
     audio_tag = f'<audio controls preload="metadata" style="display:block;width:100%;max-width:380px;margin:0 auto;accent-color:#9B8B75;opacity:0.85;"><source src="data:audio/mpeg;base64,{audio_b64}" type="audio/mpeg"></audio>'
 
 # ─────────────────────────────────────────────
-#  FULL PAGE via components.html
-#  This bypasses Streamlit's iframe sandbox entirely,
-#  giving us full CSS control including fixed positioning.
+#  STRATEGY: inject a position:fixed full-screen div
+#  directly into the Streamlit parent page via st.markdown.
+#  This div sits on top of everything and IS the page.
+#  No iframe, no height issues, position:fixed works natively.
 # ─────────────────────────────────────────────
-import streamlit.components.v1 as components
-
-components.html(f"""
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&display=swap" rel="stylesheet">
+st.markdown(f"""
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&display=swap');
 
-  * {{
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  /* ── HIDE ALL STREAMLIT CHROME ── */
+  #MainMenu, header, footer,
+  [data-testid="stToolbar"],
+  [data-testid="stDecoration"],
+  [data-testid="stStatusWidget"],
+  [data-testid="stSidebarNav"],
+  section[data-testid="stSidebar"] {{
+    display: none !important;
   }}
 
-    html, body {{
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    background-color: #FDFBF7;
-    font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  /* ── KILL DEFAULT STREAMLIT BACKGROUND & PADDING ── */
+  html, body,
+  [data-testid="stAppViewContainer"],
+  [data-testid="stAppViewBlockContainer"],
+  .main, .block-container {{
+    background: #FDFBF7 !important;
+    color-scheme: light !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+  }}
+
+  /* ── FULL-SCREEN OVERLAY: this IS the page ── */
+  #chapter-page {{
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: #FDFBF7;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding-top: 26vh;
+    padding-left: 2rem;
+    padding-right: 2rem;
+    font-family: 'Playfair Display', Georgia, serif;
     color: #4A4A4A;
     -webkit-font-smoothing: antialiased;
+    z-index: 99999;
+    text-align: center;
+    overflow: hidden;
   }}
 
   /* ── FADE-IN KEYFRAMES ── */
   @keyframes fadeUp {{
-    from {{ opacity: 0; transform: translateY(7px); }}
-    to   {{ opacity: 1; transform: translateY(0);   }}
-  }}
-
-  /* ── MAIN CONTENT BLOCK ── */
-  .page {{
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    padding: 22vh 2rem 6rem 2rem;
-    max-width: 560px;
-    margin: 0 auto;
+    from {{ opacity: 0; transform: translateY(14px); }}
+    to   {{ opacity: 1; transform: translateY(0); }}
   }}
 
   /* ── TITLE ── */
-  .title {{
+  #chapter-page .title {{
     font-size: 50px;
     font-weight: 500;
     letter-spacing: 0.05em;
@@ -95,7 +90,7 @@ components.html(f"""
   }}
 
   /* ── SUBTITLE ── */
-  .subtitle {{
+  #chapter-page .subtitle {{
     font-size: 15.6px;
     font-style: italic;
     font-weight: 400;
@@ -106,14 +101,15 @@ components.html(f"""
     animation: fadeUp 1.6s ease-out 1.5s both;
   }}
 
-  /* ── PLAYER BLOCK (track info + audio) ── */
-  .player-block {{
+  /* ── PLAYER BLOCK ── */
+  #chapter-page .player-block {{
     width: 100%;
+    max-width: 420px;
     animation: fadeUp 1.4s ease-out 2.5s both;
   }}
 
   /* ── DIVIDER ── */
-  .divider {{
+  #chapter-page .divider {{
     width: 36px;
     height: 1px;
     background-color: #C8BFB0;
@@ -121,16 +117,17 @@ components.html(f"""
   }}
 
   /* ── TRACK INFO ── */
-  .track {{
+  #chapter-page .track {{
     font-size: 12px;
     color: #9B9083;
     letter-spacing: 0.08em;
     margin-bottom: 0.8rem;
     line-height: 1.6;
+    font-family: 'Playfair Display', Georgia, serif;
   }}
 
-  /* ── AUDIO ELEMENT ── */
-  audio {{
+  /* ── AUDIO ── */
+  #chapter-page audio {{
     display: block;
     width: 100%;
     max-width: 380px;
@@ -139,46 +136,34 @@ components.html(f"""
     opacity: 0.85;
   }}
 
-  /* ── FOOTNOTE — fixed to bottom ── */
-  .footnote {{
+  /* ── FOOTNOTE — truly fixed to bottom of screen ── */
+  #chapter-footnote {{
     position: fixed;
     bottom: 1.6rem;
     left: 0;
     right: 0;
     text-align: center;
     font-size: 9px;
+    font-family: 'Playfair Display', Georgia, serif;
     color: #C0B8B0;
     letter-spacing: 1.6em;
     text-transform: uppercase;
+    z-index: 99999;
     animation: fadeUp 1.2s ease-out 3.5s both;
   }}
-
 </style>
-</head>
-<body>
 
-  <div class="page">
-
-    <p class="title">Chapter 48</p>
-
-    <p class="subtitle">An intermezzo before the pages ahead</p>
-
-    <div class="player-block">
-      <div class="divider"></div>
-      <p class="track">Brahms: Intermezzo Op. 118, No. 2 (1893)</p>
-      {audio_tag}
-    </div>
-
+<!-- MAIN PAGE DIV — covers entire screen -->
+<div id="chapter-page">
+  <p class="title">Chapter 48</p>
+  <p class="subtitle">An intermezzo before the pages ahead</p>
+  <div class="player-block">
+    <div class="divider"></div>
+    <p class="track">Brahms: Intermezzo Op. 118, No. 2 (1893)</p>
+    {audio_tag}
   </div>
+</div>
 
-  <p class="footnote">Douglas</p>
-<script>
-    // 动态通知父级 iframe 调整到屏幕真实高度
-    const h = window.screen.height;
-    window.parent.document.querySelectorAll('iframe').forEach(f => {{
-      f.style.height = h + 'px';
-    }});
-      </script>
-</body>
-</html>
-""", height=500, scrolling=False)
+<!-- FOOTNOTE — separate fixed element -->
+<p id="chapter-footnote">Douglas</p>
+""", unsafe_allow_html=True)
