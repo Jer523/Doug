@@ -82,7 +82,7 @@ components.html(f"""
 
   /* ── SUBTITLE ── */
   .subtitle {{
-    font-size: 16px;
+    font-size: 15.5px;
     font-style: italic;
     font-weight: 400;
     color: #6A6A6A;
@@ -147,7 +147,7 @@ components.html(f"""
 
     <p class="title">Chapter 48</p>
 
-    <p class="subtitle">An intermezzo before the pages ahead.</p>
+    <p class="subtitle">An intermezzo before the pages ahead</p>
 
     <div class="player-block">
       <div class="divider"></div>
