@@ -88,7 +88,7 @@ st.markdown(f"""
 
   /* ── DIVIDER ── */
   #chapter-page .divider {{
-    width: 36px;
+    width: 70px;
     height: 1px;
     background-color: #C8BFB0;
     margin: 0 auto 2rem auto;
@@ -96,7 +96,7 @@ st.markdown(f"""
 
   /* ── TRACK INFO ── */
   #chapter-page .track {{
-    font-size: 12px;
+    font-size: 12.5px;
     color: #9B9083;
     letter-spacing: 0.08em;
     margin-bottom: 0.8rem;
