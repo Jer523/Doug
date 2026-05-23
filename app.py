@@ -145,7 +145,7 @@ audio {
 
 /* Title */
 .title-text {
-    font-size: clamp(2.6rem, 6vw, 4rem);
+    font-size: clamp(3.2rem, 9vw, 4.5rem);
     font-weight: 500;
     letter-spacing: 0.06em;
     color: #333333;
