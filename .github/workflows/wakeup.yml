@@ -1,4 +1,4 @@
- name: Keep Douglas Awake
+name: Keep Douglas Awake
 
 on:
   schedule:
