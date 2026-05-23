@@ -3,7 +3,7 @@ import os
 import base64
 
 st.set_page_config(
-    page_title="Chapter 48",
+    page_title="CHAPTER 48",
     page_icon="🎵",
     layout="centered",
     initial_sidebar_state="collapsed",
@@ -145,7 +145,7 @@ components.html(f"""
 
   <div class="page">
 
-    <p class="title">Chapter 48</p>
+    <p class="title">CHAPTER 48</p>
 
     <p class="subtitle">An intermezzo before the pages ahead</p>
 
