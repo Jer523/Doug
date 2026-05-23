@@ -109,7 +109,7 @@ components.html(f"""
     width:100%;
     max-width:270px;
     /* align with the progress bar: skip the button width + gap */
-    padding-left: calc(6px + 36px + 24px); /* player padding-left + btn width + gap */
+    padding-left: calc(100px + 36px + 24px); /* player padding-left + btn width + gap */
     margin:0 auto 10px auto;
     box-sizing:border-box;
   }}
