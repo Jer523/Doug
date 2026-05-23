@@ -96,13 +96,14 @@ HTML = """
     line-height:1.6;
   }
 
-  /* Visualizer: same left-edge as progress bar */
+  /* viz-wrap: same left edge as progress bar */
   .viz-wrap {
     width:100%;
     max-width:270px;
     padding-left: calc(5px + 36px + 14px);
     margin:0 auto 8px auto;
     box-sizing:border-box;
+    overflow:hidden;
   }
   #viz-canvas {
     display:block;
@@ -250,12 +251,12 @@ HTML = """
     try {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 256;
-      analyser.smoothingTimeConstant = 0.6;
+      analyser.fftSize = 512;                   // 256 bins, better resolution
+      analyser.smoothingTimeConstant = 0.7;
       const source = audioCtx.createMediaElementSource(audio);
       source.connect(analyser);
       analyser.connect(audioCtx.destination);
-      dataArray = new Uint8Array(analyser.frequencyBinCount); // 128 bins
+      dataArray = new Uint8Array(analyser.frequencyBinCount); // 256
     } catch(e) {
       console.warn('Web Audio unavailable:', e);
     }
@@ -312,20 +313,21 @@ HTML = """
   window.addEventListener('touchend',   () => { draggingProgress=false; });
 
   // ── Visualizer ──
-  const canvas = document.getElementById('viz-canvas');
-  const ctx    = canvas.getContext('2d');
+  const canvas  = document.getElementById('viz-canvas');
+  const ctx     = canvas.getContext('2d');
 
-  const BAR_COUNT = 44;       // total bars
-  const HALF      = BAR_COUNT / 2;  // 22 per side
-  const BAR_W     = 3;
-  const BAR_GAP   = 2;
-  const MAX_H     = 24;
-  const MIN_H     = 2;
+  const BAR_COUNT = 44;
+  const HALF      = BAR_COUNT / 2;   // 22 bars per side
+  const BAR_GAP   = 2;               // fixed gap
+  // BAR_W is computed dynamically each frame from canvas size
+
+  const MAX_H = 24;
+  const MIN_H = 2;
 
   const bars = Array.from({length: BAR_COUNT}, () => ({
     h: MIN_H,
     target: MIN_H,
-    speed: 0.18 + Math.random() * 0.08
+    speed: 0.2 + Math.random() * 0.1
   }));
 
   if (!CanvasRenderingContext2D.prototype.roundRect) {
@@ -348,38 +350,41 @@ HTML = """
 
   function drawViz() {
     const dpr = window.devicePixelRatio || 1;
-    const W = canvas.width  / dpr;
-    const H = canvas.height / dpr;
+    const W   = canvas.width  / dpr;
+    const H   = canvas.height / dpr;
     ctx.clearRect(0, 0, W, H);
+
+    // Dynamic bar width: fill canvas exactly, no overflow, no gaps
+    const BAR_W = (W - (BAR_COUNT - 1) * BAR_GAP) / BAR_COUNT;
 
     const playing = !audio.paused && !audio.ended;
 
     if (playing) {
       if (analyser && dataArray) {
         analyser.getByteFrequencyData(dataArray);
-        // Mirror from centre: bar index 0 = innermost (low freq), HALF-1 = outermost (high freq)
-        // Left half: bars[HALF-1-i] | Right half: bars[HALF+i]
-        // Use log-ish mapping so low-freq bins (where piano lives) get more bars
+        // Mirror symmetry: index 0 = outermost edge, HALF-1 = innermost (centre)
+        // Bin 0 is DC — skip it. Map HALF bars linearly across bins 1..60
+        // This covers piano's main frequency range (roughly 170Hz–10kHz)
         for (let i = 0; i < HALF; i++) {
-          // Log scale: concentrate more bars in lower bins
-          const t = i / (HALF - 1);                          // 0..1
-          const binIndex = Math.round(Math.pow(t, 0.6) * 90); // bins 0..90, log-ish
-          const raw  = dataArray[binIndex] / 255;
-          // Strong boost so quiet passages still show movement
-          const boosted = Math.min(1, raw * 3.5);
-          const target  = MIN_H + boosted * (MAX_H - MIN_H);
+          // i=0 → outermost bar → higher freq bin
+          // i=HALF-1 → innermost bar → bin 1 (lowest non-DC)
+          const t        = i / (HALF - 1);                     // 0=outer,1=inner
+          const binIndex = 1 + Math.round((1 - t) * 59);       // bins 1..60, inner=low, outer=high
+          const raw      = dataArray[binIndex] / 255;           // 0..1, no DC
+          // Moderate boost — Brahms is dynamic, don't clip
+          const boosted  = Math.min(1, raw * 2.2);
+          const target   = MIN_H + boosted * (MAX_H - MIN_H);
 
-          bars[HALF - 1 - i].target = target; // left side (innermost = center)
-          bars[HALF + i].target     = target; // right side
+          bars[HALF - 1 - i].target = target;  // left half: index HALF-1=centre → 0=edge
+          bars[HALF + i].target     = target;  // right half: index HALF=centre → BAR_COUNT-1=edge
         }
       } else {
-        // Fallback random until Web Audio ready
+        // Fallback random until Web Audio initialises
         tickCount++;
-        if (tickCount >= 6) {
+        if (tickCount >= 5) {
           tickCount = 0;
           for (let i = 0; i < HALF; i++) {
-            const r = Math.random();
-            const t = MIN_H + r * (MAX_H - MIN_H);
+            const t = MIN_H + Math.random() * (MAX_H - MIN_H);
             bars[HALF - 1 - i].target = t;
             bars[HALF + i].target     = t;
           }
@@ -389,14 +394,13 @@ HTML = """
       for (let i = 0; i < BAR_COUNT; i++) bars[i].target = MIN_H;
     }
 
-    const totalW = BAR_COUNT * BAR_W + (BAR_COUNT - 1) * BAR_GAP;
-    let x = (W - totalW) / 2;
-
+    // Draw
+    let x = 0;
     for (let i = 0; i < BAR_COUNT; i++) {
       bars[i].h += (bars[i].target - bars[i].h) * bars[i].speed;
       if (bars[i].h < MIN_H) bars[i].h = MIN_H;
       const barH = bars[i].h;
-      const y = (H - barH) / 2;
+      const y    = (H - barH) / 2;
       ctx.fillStyle = '#B8A898';
       ctx.beginPath();
       ctx.roundRect(x, y, BAR_W, barH, 1);
