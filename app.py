@@ -54,7 +54,7 @@ components.html(f"""
     flex-direction:column;
     align-items:center;
     text-align:center;
-    padding: 26vh 2rem 0 2rem;
+    padding:26vh 2rem 0 2rem;
     max-width:560px;
     margin:0 auto;
   }}
@@ -100,21 +100,112 @@ components.html(f"""
     line-height:1.6;
   }}
 
-  /* ── 原生 audio 样式 ── */
-  audio {{
-    display:block;
+  /* ── 播放器整体 ── */
+  .player-wrap {{
     width:100%;
-    max-width:340px;
+    max-width:380px;
     margin:0 auto;
-    /* 用 accent-color 给进度条和控件上暖色调 */
-    accent-color: #9B8B75;
-    opacity:0.9;
-    /* 让背景透明，融入页面 */
-    background: transparent;
-    border-radius: 8px;
+    display:flex;
+    align-items:center;
+    gap:14px;
   }}
 
-  /* footnote */
+  /* ── 播放/暂停按钮 ── */
+  #play-btn {{
+    flex-shrink:0;
+    width:36px; height:36px;
+    border-radius:50%;
+    border:1px solid #C8BFB0;
+    background:transparent;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:0;
+  }}
+  #play-btn svg {{ width:13px; height:13px; fill:#7A6E65; }}
+
+  /* ── 进度条 ── */
+  .progress-wrap {{
+    flex:1;
+    position:relative;
+    height:20px;
+    display:flex;
+    align-items:center;
+  }}
+
+  .progress-track {{
+    width:100%;
+    height:1px;
+    background:#DDD6CE;
+    position:relative;
+    cursor:pointer;
+    border-radius:1px;
+  }}
+
+  #progress-fill {{
+    height:100%;
+    width:0%;
+    background:#9B8B75;
+    border-radius:1px;
+    pointer-events:none;
+  }}
+
+  #scrubber {{
+    position:absolute;
+    top:50%; left:0%;
+    transform:translate(-50%,-50%);
+    width:7px; height:7px;
+    border-radius:50%;
+    background:#9B8B75;
+    pointer-events:none;
+  }}
+
+  /* ── tooltip ── */
+  #time-tooltip {{
+    position:absolute;
+    top:-18px;
+    left:0%;
+    transform:translateX(-50%);
+    font-size:9px;
+    color:#9B9083;
+    white-space:nowrap;
+    opacity:0;
+    transition:opacity 0.2s;
+    pointer-events:none;
+  }}
+
+  /* ── 音量：垂直滑块容器 ── */
+  .vol-wrap {{
+    flex-shrink:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+    width:20px;
+  }}
+
+  .vol-icon svg {{
+    width:11px; height:11px;
+    fill:#B8B0A5;
+    display:block;
+  }}
+
+  /* 垂直音量滑块 */
+  #vol-slider {{
+    -webkit-appearance:slider-vertical;
+    writing-mode:vertical-lr;
+    direction:rtl;
+    width:4px;
+    height:50px;
+    accent-color:#9B8B75;
+    cursor:pointer;
+    background:transparent;
+    outline:none;
+    border:none;
+    padding:0;
+  }}
+
   .footnote {{
     position:fixed;
     bottom:1.6rem;
@@ -136,29 +227,139 @@ components.html(f"""
   <div class="player-block">
     <div class="divider"></div>
     <p class="track">Brahms: Intermezzo Op. 118, No. 2 (1893)</p>
-    <audio controls preload="none">
+
+    <!-- 不加 crossorigin，避免 CORS 阻止播放 -->
+    <audio id="audio-el" preload="none">
       <source src="{AUDIO_URL}" type="audio/mpeg">
     </audio>
+
+    <div class="player-wrap">
+
+      <button id="play-btn" id="play-btn">
+        <svg id="icon-play" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+        <svg id="icon-pause" viewBox="0 0 24 24" style="display:none">
+          <rect x="5" y="3" width="4" height="18"/>
+          <rect x="15" y="3" width="4" height="18"/>
+        </svg>
+      </button>
+
+      <div class="progress-wrap">
+        <div id="time-tooltip"></div>
+        <div class="progress-track" id="progress-track">
+          <div id="progress-fill"></div>
+          <div id="scrubber"></div>
+        </div>
+      </div>
+
+      <div class="vol-wrap">
+        <span class="vol-icon">
+          <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+        </span>
+        <input type="range" id="vol-slider" min="0" max="1" step="0.05" value="0.8"
+               orient="vertical">
+      </div>
+
+    </div>
   </div>
 </div>
 
 <p class="footnote">Douglas</p>
 
 <script>
-  // iframe 撑满屏幕
+  const audio    = document.getElementById('audio-el');
+  const iconPlay  = document.getElementById('icon-play');
+  const iconPause = document.getElementById('icon-pause');
+  const fill      = document.getElementById('progress-fill');
+  const scrubber  = document.getElementById('scrubber');
+  const trackEl   = document.getElementById('progress-track');
+  const tooltip   = document.getElementById('time-tooltip');
+  const volSlider = document.getElementById('vol-slider');
+  const playBtn   = document.getElementById('play-btn');
+
+  audio.volume = 0.8;
+  let tooltipTimer = null;
+  let dragging = false;
+
+  function fmt(s) {{
+    if (!isFinite(s) || isNaN(s)) return '';
+    const m = Math.floor(s/60);
+    const sec = String(Math.floor(s%60)).padStart(2,'0');
+    return m+':'+sec;
+  }}
+
+  function showTooltip(pct, t) {{
+    const label = fmt(t);
+    if (!label) return;
+    tooltip.textContent = label;
+    // clamp so tooltip doesn't go off edges
+    const clamped = Math.max(0, Math.min(100, pct*100));
+    tooltip.style.left = clamped + '%';
+    tooltip.style.opacity = '1';
+    clearTimeout(tooltipTimer);
+    tooltipTimer = setTimeout(() => tooltip.style.opacity = '0', 1500);
+  }}
+
+  // Play/pause
+  playBtn.addEventListener('click', () => {{
+    if (audio.paused) {{
+      audio.play().catch(err => console.log('play error:', err));
+    }} else {{
+      audio.pause();
+    }}
+  }});
+
+  audio.addEventListener('play', () => {{
+    iconPlay.style.display  = 'none';
+    iconPause.style.display = 'block';
+  }});
+  audio.addEventListener('pause', () => {{
+    iconPlay.style.display  = 'block';
+    iconPause.style.display = 'none';
+  }});
+  audio.addEventListener('ended', () => {{
+    iconPlay.style.display  = 'block';
+    iconPause.style.display = 'none';
+    fill.style.width       = '0%';
+    scrubber.style.left    = '0%';
+  }});
+
+  // Progress update
+  audio.addEventListener('timeupdate', () => {{
+    if (!audio.duration) return;
+    const pct = audio.currentTime / audio.duration;
+    fill.style.width    = (pct*100)+'%';
+    scrubber.style.left = (pct*100)+'%';
+  }});
+
+  // Seek helpers
+  function getPct(e) {{
+    const rect = trackEl.getBoundingClientRect();
+    const x = e.touches ? e.touches[0].clientX : e.clientX;
+    return Math.max(0, Math.min(1, (x - rect.left) / rect.width));
+  }}
+  function doSeek(pct) {{
+    if (!audio.duration) return;
+    audio.currentTime = pct * audio.duration;
+    showTooltip(pct, audio.currentTime);
+  }}
+
+  trackEl.addEventListener('mousedown',  e => {{ dragging=true; doSeek(getPct(e)); e.preventDefault(); }});
+  trackEl.addEventListener('touchstart', e => {{ dragging=true; doSeek(getPct(e)); }}, {{passive:true}});
+  document.addEventListener('mousemove',  e => {{ if(dragging) doSeek(getPct(e)); }});
+  document.addEventListener('touchmove',  e => {{ if(dragging) doSeek(getPct(e)); }}, {{passive:true}});
+  document.addEventListener('mouseup',   () => dragging=false);
+  document.addEventListener('touchend',  () => dragging=false);
+
+  // Volume
+  volSlider.addEventListener('input', () => audio.volume = parseFloat(volSlider.value));
+
+  // Stretch iframe to full screen height
   try {{
     window.parent.document.querySelectorAll('iframe').forEach(f => {{
-      f.style.height = window.screen.height + 'px';
-      f.style.position = 'fixed';
-      f.style.top = '0';
-      f.style.left = '0';
-      f.style.width = '100%';
-      f.style.border = 'none';
-      f.style.zIndex = '99999';
+      f.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:'+window.screen.height+'px;border:none;z-index:99999;';
     }});
   }} catch(e) {{}}
 </script>
-
 </body>
 </html>
 """, height=900, scrolling=False)
