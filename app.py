@@ -7,18 +7,12 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# ─────────────────────────────────────────────
-#  AUDIO
-# ─────────────────────────────────────────────
-audio_url = "https://raw.githubusercontent.com/Jer523/Douglas/main/assets/brahms_op118_no2.mp3.mp3"
-audio_tag = f'<audio controls preload="none" style="display:block;width:100%;max-width:380px;margin:0 auto;accent-color:#9B8B75;opacity:0.85;"><source src="{audio_url}" type="audio/mpeg"></audio>'
+audio_url = "https://raw.githubusercontent.com/Jer523/Douglas/main/assets/brahms_op118_no2.mp3"
 
-# ─────────────────────────────────────────────
 st.markdown(f"""
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&display=swap');
 
-  /* ── KILL DEFAULT STREAMLIT BACKGROUND & PADDING ── */
   html, body,
   [data-testid="stAppViewContainer"],
   [data-testid="stAppViewBlockContainer"],
@@ -30,7 +24,6 @@ st.markdown(f"""
     overflow: hidden !important;
   }}
 
-  /* ── FULL-SCREEN OVERLAY: this IS the page ── */
   #chapter-page {{
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
@@ -50,13 +43,11 @@ st.markdown(f"""
     overflow: hidden;
   }}
 
-  /* ── FADE-IN KEYFRAMES ── */
   @keyframes fadeUp {{
     from {{ opacity: 0; transform: translateY(14px); }}
     to   {{ opacity: 1; transform: translateY(0); }}
   }}
 
-  /* ── TITLE ── */
   #chapter-page .title {{
     font-size: 50px;
     font-weight: 500;
@@ -67,7 +58,6 @@ st.markdown(f"""
     animation: fadeUp 1.6s ease-out 0.5s both;
   }}
 
-  /* ── SUBTITLE ── */
   #chapter-page .subtitle {{
     font-size: 15.6px;
     font-style: italic;
@@ -79,42 +69,103 @@ st.markdown(f"""
     animation: fadeUp 1.6s ease-out 1.5s both;
   }}
 
-  /* ── PLAYER BLOCK ── */
   #chapter-page .player-block {{
     width: 100%;
     max-width: 420px;
     animation: fadeUp 1.4s ease-out 2.5s both;
   }}
 
-  /* ── DIVIDER ── */
+  /* ── DIVIDER ── 改 width 调长度 */
   #chapter-page .divider {{
-    width: 270px;
+    width: 80px;
     height: 1px;
     background-color: #C8BFB0;
     margin: 0 auto 2rem auto;
   }}
 
-  /* ── TRACK INFO ── */
+  /* ── TRACK INFO ── 改 font-size 调字号 */
   #chapter-page .track {{
-    font-size: 12.3px;
+    font-size: 11px;
     color: #9B9083;
     letter-spacing: 0.08em;
-    margin-bottom: 0.8rem;
+    margin-bottom: 1.4rem;
     line-height: 1.6;
     font-family: 'Playfair Display', Georgia, serif;
   }}
 
-  /* ── AUDIO ── */
-  #chapter-page audio {{
-    display: block;
+  /* ── CUSTOM AUDIO PLAYER ── */
+  .player-wrap {{
     width: 100%;
     max-width: 380px;
     margin: 0 auto;
-    accent-color: #9B8B75;
-    opacity: 0.85;
+    display: flex;
+    align-items: center;
+    gap: 14px;
   }}
 
-  /* ── FOOTNOTE — truly fixed to bottom of screen ── */
+  /* Play/pause button */
+  #play-btn {{
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid #C8BFB0;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.3s, opacity 0.3s;
+    padding: 0;
+  }}
+  #play-btn:hover {{ border-color: #9B8B75; opacity: 0.8; }}
+  #play-btn svg {{ width: 14px; height: 14px; fill: #7A6E65; }}
+
+  /* Progress bar track */
+  .progress-track {{
+    flex: 1;
+    height: 1px;
+    background: #DDD6CE;
+    position: relative;
+    cursor: pointer;
+    border-radius: 1px;
+  }}
+
+  /* Progress bar fill */
+  #progress-fill {{
+    height: 100%;
+    width: 0%;
+    background: #9B8B75;
+    border-radius: 1px;
+    transition: width 0.1s linear;
+    pointer-events: none;
+  }}
+
+  /* Scrubber dot */
+  #scrubber {{
+    position: absolute;
+    top: 50%;
+    left: 0%;
+    transform: translate(-50%, -50%);
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #9B8B75;
+    pointer-events: none;
+    transition: left 0.1s linear;
+  }}
+
+  /* Time display */
+  #time-display {{
+    flex-shrink: 0;
+    font-size: 9px;
+    font-family: 'Playfair Display', Georgia, serif;
+    color: #B8B0A5;
+    letter-spacing: 0.05em;
+    min-width: 70px;
+    text-align: right;
+  }}
+
   #chapter-footnote {{
     position: fixed;
     bottom: 1.6rem;
@@ -131,17 +182,99 @@ st.markdown(f"""
   }}
 </style>
 
-<!-- MAIN PAGE DIV — covers entire screen -->
 <div id="chapter-page">
   <p class="title">Chapter 48</p>
   <p class="subtitle">An intermezzo before the pages ahead</p>
   <div class="player-block">
     <div class="divider"></div>
     <p class="track">Brahms: Intermezzo Op. 118, No. 2 (1893)</p>
-    {audio_tag}
+
+    <!-- Hidden native audio element -->
+    <audio id="audio-el" preload="none">
+      <source src="{audio_url}" type="audio/mpeg">
+    </audio>
+
+    <!-- Custom player UI -->
+    <div class="player-wrap">
+
+      <!-- Play / Pause button -->
+      <button id="play-btn" onclick="togglePlay()">
+        <svg id="icon-play" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+        <svg id="icon-pause" viewBox="0 0 24 24" style="display:none">
+          <rect x="5" y="3" width="4" height="18"/>
+          <rect x="15" y="3" width="4" height="18"/>
+        </svg>
+      </button>
+
+      <!-- Progress track -->
+      <div class="progress-track" id="progress-track" onclick="seek(event)">
+        <div id="progress-fill"></div>
+        <div id="scrubber"></div>
+      </div>
+
+      <!-- Time -->
+      <span id="time-display">0:00 / —:——</span>
+
+    </div>
   </div>
 </div>
 
-<!-- FOOTNOTE — separate fixed element -->
 <p id="chapter-footnote">Douglas</p>
+
+<script>
+  const audio = document.getElementById('audio-el');
+  const playBtn = document.getElementById('play-btn');
+  const iconPlay = document.getElementById('icon-play');
+  const iconPause = document.getElementById('icon-pause');
+  const fill = document.getElementById('progress-fill');
+  const scrubber = document.getElementById('scrubber');
+  const timeDisplay = document.getElementById('time-display');
+
+  function fmt(s) {{
+    if (isNaN(s)) return '—:——';
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60).toString().padStart(2, '0');
+    return m + ':' + sec;
+  }}
+
+  function togglePlay() {{
+    if (audio.paused) {{
+      audio.play();
+    }} else {{
+      audio.pause();
+    }}
+  }}
+
+  audio.addEventListener('play', () => {{
+    iconPlay.style.display = 'none';
+    iconPause.style.display = 'block';
+  }});
+
+  audio.addEventListener('pause', () => {{
+    iconPlay.style.display = 'block';
+    iconPause.style.display = 'none';
+  }});
+
+  audio.addEventListener('timeupdate', () => {{
+    if (!audio.duration) return;
+    const pct = (audio.currentTime / audio.duration) * 100;
+    fill.style.width = pct + '%';
+    scrubber.style.left = pct + '%';
+    timeDisplay.textContent = fmt(audio.currentTime) + ' / ' + fmt(audio.duration);
+  }});
+
+  audio.addEventListener('ended', () => {{
+    iconPlay.style.display = 'block';
+    iconPause.style.display = 'none';
+    fill.style.width = '0%';
+    scrubber.style.left = '0%';
+  }});
+
+  function seek(e) {{
+    const track = document.getElementById('progress-track');
+    const rect = track.getBoundingClientRect();
+    const pct = (e.clientX - rect.left) / rect.width;
+    audio.currentTime = pct * audio.duration;
+  }}
+</script>
 """, unsafe_allow_html=True)
