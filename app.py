@@ -71,7 +71,7 @@ components.html(f"""
 
   /* ── TITLE ── */
   .title {{
-    font-size: 60px;
+    font-size: 40px;
     font-weight: 500;
     letter-spacing: 0.05em;
     color: #2E2E2E;
