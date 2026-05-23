@@ -107,7 +107,7 @@ components.html(f"""
 
   .player-wrap {{
     width:100%;
-    max-width:380px;
+    max-width:330px;
     margin:0 auto;
     display:flex;
     align-items:center;
