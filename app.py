@@ -35,7 +35,6 @@ components.html(f"""
 <style>
   * {{
     margin:0; padding:0; box-sizing:border-box;
-    /* 3. 全局禁止文字选中 */
     -webkit-user-select:none;
     user-select:none;
   }}
@@ -101,17 +100,34 @@ components.html(f"""
     font-size:12px;
     color:#9B9083;
     letter-spacing:0.08em;
-    margin-bottom:1.4rem;
+    margin-bottom:1.2rem;
     line-height:1.6;
   }}
 
+  /* ── Visualizer ── */
+  .viz-wrap {{
+    width:100%;
+    max-width:270px;
+    /* align with the progress bar: skip the button width + gap */
+    padding-left: calc(10px + 36px + 24px); /* player padding-left + btn width + gap */
+    margin:0 auto 10px auto;
+    box-sizing:border-box;
+  }}
+  #viz-canvas {{
+    display:block;
+    width:100%;
+    height:32px;
+  }}
+
+  /* ── Player row ── */
   .player-wrap {{
     width:100%;
     max-width:270px;
     margin:0 auto;
     display:flex;
     align-items:center;
-    gap:14px;
+    gap:24px;          /* ← increased from 14px */
+    padding-left:10px; /* ← shift button right */
   }}
 
   #play-btn {{
@@ -129,11 +145,9 @@ components.html(f"""
   }}
   #play-btn svg {{ width:13px; height:13px; fill:#7A6E65; }}
 
-  /* 进度条区域 */
   .progress-wrap {{
     flex:1;
     position:relative;
-    /* 2. 加大感应高度 */
     height:44px;
     display:flex;
     align-items:center;
@@ -179,6 +193,10 @@ components.html(f"""
     pointer-events:none;
   }}
 
+  .vol-wrap {{
+    display:none; /* keep vol hidden as before */
+  }}
+
   .footnote {{
     position:fixed;
     bottom:1.6rem;
@@ -205,8 +223,12 @@ components.html(f"""
       <source src="{AUDIO_URL}" type="audio/mpeg">
     </audio>
 
-    <div class="player-wrap">
+    <!-- Visualizer sits above the player row, aligned with the progress bar -->
+    <div class="viz-wrap">
+      <canvas id="viz-canvas"></canvas>
+    </div>
 
+    <div class="player-wrap">
       <button id="play-btn">
         <svg id="icon-play" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
         <svg id="icon-pause" viewBox="0 0 24 24" style="display:none">
@@ -222,17 +244,6 @@ components.html(f"""
           <div id="scrubber"></div>
         </div>
       </div>
-
-      <div class="vol-wrap">
-        <span class="vol-icon">
-          <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
-        </span>
-        <div id="vol-track">
-          <div id="vol-fill"></div>
-          <div id="vol-thumb"></div>
-        </div>
-      </div>
-
     </div>
   </div>
 </div>
@@ -240,31 +251,22 @@ components.html(f"""
 <p class="footnote">Douglas</p>
 
 <script>
-  const audio     = document.getElementById('audio-el');
-  const iconPlay  = document.getElementById('icon-play');
-  const iconPause = document.getElementById('icon-pause');
-  const fill      = document.getElementById('progress-fill');
-  const scrubber  = document.getElementById('scrubber');
+  const audio        = document.getElementById('audio-el');
+  const iconPlay     = document.getElementById('icon-play');
+  const iconPause    = document.getElementById('icon-pause');
+  const fill         = document.getElementById('progress-fill');
+  const scrubber     = document.getElementById('scrubber');
   const progressWrap = document.getElementById('progress-wrap');
-  const tooltip   = document.getElementById('time-tooltip');
-  const volTrack  = document.getElementById('vol-track');
-  const volFill   = document.getElementById('vol-fill');
-  const volThumb  = document.getElementById('vol-thumb');
+  const tooltip      = document.getElementById('time-tooltip');
 
-  let vol = 0.8;
-  audio.volume = vol;
-  setVolUI(vol);
-
-  let tooltipTimer = null;
+  let tooltipTimer     = null;
   let draggingProgress = false;
-  let draggingVol = false;
 
   // ── helpers ──
   function fmt(s) {{
     if (!isFinite(s) || isNaN(s) || s < 0) return '';
     return Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0');
   }}
-
   function showTooltip(pct, t) {{
     const label = fmt(t);
     if (!label) return;
@@ -272,77 +274,4 @@ components.html(f"""
     tooltip.style.left = Math.max(5, Math.min(95, pct*100)) + '%';
     tooltip.style.opacity = '1';
     clearTimeout(tooltipTimer);
-    tooltipTimer = setTimeout(() => tooltip.style.opacity='0', 1500);
-  }}
-
-  function updateProgress(pct) {{
-    fill.style.width    = (pct*100) + '%';
-    scrubber.style.left = (pct*100) + '%';
-  }}
-
-  function setVolUI(v) {{
-    const pct = Math.max(0, Math.min(1, v));
-    volFill.style.height = (pct*100) + '%';
-    volThumb.style.bottom = (pct*100) + '%';
-  }}
-
-  // ── play/pause ──
-  document.getElementById('play-btn').addEventListener('click', () => {{
-    audio.paused ? audio.play().catch(()=>{{}}) : audio.pause();
-  }});
-  audio.addEventListener('play',  () => {{ iconPlay.style.display='none';  iconPause.style.display='block'; }});
-  audio.addEventListener('pause', () => {{ iconPlay.style.display='block'; iconPause.style.display='none';  }});
-  audio.addEventListener('ended', () => {{ iconPlay.style.display='block'; iconPause.style.display='none'; updateProgress(0); }});
-  audio.addEventListener('timeupdate', () => {{
-    if (audio.duration) updateProgress(audio.currentTime / audio.duration);
-  }});
-
-  // ── progress seek ──
-  function progressPct(e) {{
-    const rect = progressWrap.getBoundingClientRect();
-    const x = e.touches ? e.touches[0].clientX : e.clientX;
-    return Math.max(0, Math.min(1, (x - rect.left) / rect.width));
-  }}
-  function doSeek(e) {{
-    const pct = progressPct(e);
-    updateProgress(pct);
-    if (audio.duration) {{
-      audio.currentTime = pct * audio.duration;
-      showTooltip(pct, audio.currentTime);
-    }}
-  }}
-  progressWrap.addEventListener('mousedown',  e => {{ draggingProgress=true; doSeek(e); e.preventDefault(); }});
-  progressWrap.addEventListener('touchstart', e => {{ draggingProgress=true; doSeek(e); }}, {{passive:true}});
-  window.addEventListener('mousemove',  e => {{ if(draggingProgress) doSeek(e); }});
-  window.addEventListener('touchmove',  e => {{ if(draggingProgress) doSeek(e); }}, {{passive:true}});
-  window.addEventListener('mouseup',    () => draggingProgress=false);
-  window.addEventListener('touchend',   () => {{ draggingProgress=false; draggingVol=false; }});
-
-  // ── volume (custom JS vertical slider) ──
-  function volPct(e) {{
-    const rect = volTrack.getBoundingClientRect();
-    const y = e.touches ? e.touches[0].clientY : e.clientY;
-    // bottom = max volume, top = min
-    return Math.max(0, Math.min(1, 1 - (y - rect.top) / rect.height));
-  }}
-  function doVol(e) {{
-    vol = volPct(e);
-    audio.volume = vol;
-    setVolUI(vol);
-  }}
-  volTrack.addEventListener('mousedown',  e => {{ draggingVol=true; doVol(e); e.preventDefault(); }});
-  volTrack.addEventListener('touchstart', e => {{ draggingVol=true; doVol(e); }}, {{passive:true}});
-  window.addEventListener('mousemove',  e => {{ if(draggingVol) doVol(e); }});
-  window.addEventListener('touchmove',  e => {{ if(draggingVol) doVol(e); }}, {{passive:true}});
-  window.addEventListener('mouseup',    () => draggingVol=false);
-
-  // ── stretch iframe ──
-  try {{
-    window.parent.document.querySelectorAll('iframe').forEach(f => {{
-      f.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:'+window.screen.height+'px;border:none;z-index:99999;';
-    }});
-  }} catch(e) {{}}
-</script>
-</body>
-</html>
-""", height=900, scrolling=False)
+    tooltipTimer = setTimeout(() => tooltip.style.opacity='0', 1
