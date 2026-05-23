@@ -147,17 +147,12 @@ components.html(f"""
     text-align: center;
     font-size: 9px;
     color: #C0B8B0;
-    letter-spacing: 0.6em;
+    letter-spacing: 1.6em;
     text-transform: uppercase;
     animation: fadeUp 1.2s ease-out 4.0s both;
   }}
 
 </style>
-    html, body {{
-        height: 100vh;
-        overflow: hidden;
-    }}
-
 </head>
 <body>
 
