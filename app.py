@@ -9,6 +9,19 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+st.markdown("""
+<style>
+html, body, [data-testid="stAppViewContainer"],
+[data-testid="stAppViewBlockContainer"],
+.main, .block-container,
+iframe, [data-testid="stIFrame"] {
+    background-color: #FDFBF7 !important;
+    color-scheme: light !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
 # ─────────────────────────────────────────────
 #  AUDIO
 # ─────────────────────────────────────────────
@@ -82,7 +95,7 @@ components.html(f"""
 
   /* ── SUBTITLE ── */
   .subtitle {{
-    font-size: 15.5px;
+    font-size: 15.6px;
     font-style: italic;
     font-weight: 400;
     color: #6A6A6A;
