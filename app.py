@@ -179,53 +179,6 @@ components.html(f"""
     pointer-events:none;
   }}
 
-  /* 1. 音量：用 JS 自绘竖条，完全绕开 input[range] 的手机兼容问题 */
-  .vol-wrap {{
-    flex-shrink:0;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    gap:5px;
-    width:20px;
-  }}
-
-  .vol-icon svg {{
-    width:11px; height:11px;
-    fill:#B8B0A5;
-    display:block;
-  }}
-
-  /* 竖向音量轨道 */
-  #vol-track {{
-    width:1px;
-    height:52px;
-    background:#DDD6CE;
-    position:relative;
-    cursor:pointer;
-    touch-action:none;
-  }}
-
-  #vol-fill {{
-    position:absolute;
-    bottom:0; left:0;
-    width:100%;
-    background:#9B8B75;
-    border-radius:1px;
-  }}
-
-  #vol-thumb {{
-    position:absolute;
-    left:50%;
-    transform:translate(-50%, 50%);
-    width:9px; height:9px;
-    border-radius:50%;
-    background:#9B8B75;
-    /* 加大感应区域 */
-    padding:8px;
-    margin:-8px;
-    cursor:pointer;
-  }}
-
   .footnote {{
     position:fixed;
     bottom:1.6rem;
@@ -267,16 +220,6 @@ components.html(f"""
         <div class="progress-track">
           <div id="progress-fill"></div>
           <div id="scrubber"></div>
-        </div>
-      </div>
-
-      <div class="vol-wrap">
-        <span class="vol-icon">
-          <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
-        </span>
-        <div id="vol-track">
-          <div id="vol-fill"></div>
-          <div id="vol-thumb"></div>
         </div>
       </div>
 
@@ -364,24 +307,6 @@ components.html(f"""
   window.addEventListener('touchmove',  e => {{ if(draggingProgress) doSeek(e); }}, {{passive:true}});
   window.addEventListener('mouseup',    () => draggingProgress=false);
   window.addEventListener('touchend',   () => {{ draggingProgress=false; draggingVol=false; }});
-
-  // ── volume (custom JS vertical slider) ──
-  function volPct(e) {{
-    const rect = volTrack.getBoundingClientRect();
-    const y = e.touches ? e.touches[0].clientY : e.clientY;
-    // bottom = max volume, top = min
-    return Math.max(0, Math.min(1, 1 - (y - rect.top) / rect.height));
-  }}
-  function doVol(e) {{
-    vol = volPct(e);
-    audio.volume = vol;
-    setVolUI(vol);
-  }}
-  volTrack.addEventListener('mousedown',  e => {{ draggingVol=true; doVol(e); e.preventDefault(); }});
-  volTrack.addEventListener('touchstart', e => {{ draggingVol=true; doVol(e); }}, {{passive:true}});
-  window.addEventListener('mousemove',  e => {{ if(draggingVol) doVol(e); }});
-  window.addEventListener('touchmove',  e => {{ if(draggingVol) doVol(e); }}, {{passive:true}});
-  window.addEventListener('mouseup',    () => draggingVol=false);
 
   // ── stretch iframe ──
   try {{
