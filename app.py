@@ -21,11 +21,6 @@ if os.path.exists(AUDIO_PATH):
     audio_tag = f'<audio controls preload="metadata" style="display:block;width:100%;max-width:380px;margin:0 auto;accent-color:#9B8B75;opacity:0.85;"><source src="data:audio/mpeg;base64,{audio_b64}" type="audio/mpeg"></audio>'
 
 # ─────────────────────────────────────────────
-#  STRATEGY: inject a position:fixed full-screen div
-#  directly into the Streamlit parent page via st.markdown.
-#  This div sits on top of everything and IS the page.
-#  No iframe, no height issues, position:fixed works natively.
-# ─────────────────────────────────────────────
 st.markdown(f"""
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&display=swap');
