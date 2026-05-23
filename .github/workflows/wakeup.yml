@@ -12,5 +12,5 @@ jobs:
       - name: Ping Douglas
         run: |
           echo "正在访问 Douglas..."
-          curl -s -L https://douglas48.streamlit.app/ > /dev/null
+          curl -s --max-redirs 20 -L https://douglas48.streamlit.app/ > /dev/null || true
           echo "完成"
