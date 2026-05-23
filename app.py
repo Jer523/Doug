@@ -58,7 +58,7 @@ components.html(f"""
 
     html, body {{
     width: 100%;
-    height: 100vh;
+    height: 100%;
     overflow: hidden;
     background-color: #FDFBF7;
     font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
@@ -172,7 +172,13 @@ components.html(f"""
   </div>
 
   <p class="footnote">Douglas</p>
-
+<script>
+    // 动态通知父级 iframe 调整到屏幕真实高度
+    const h = window.screen.height;
+    window.parent.document.querySelectorAll('iframe').forEach(f => {{
+      f.style.height = h + 'px';
+    }});
+      </script>
 </body>
 </html>
 """, height=800, scrolling=False)
