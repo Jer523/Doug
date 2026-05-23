@@ -1,7 +1,9 @@
 import streamlit as st
+import os
+import base64
 
 # ─────────────────────────────────────────────
-#  Page config — must be the very first Streamlit call
+#  Page config
 # ─────────────────────────────────────────────
 st.set_page_config(
     page_title="Chapter 48",
@@ -12,18 +14,11 @@ st.set_page_config(
 
 # ─────────────────────────────────────────────
 #  CSS INJECTION
-#  Everything between the <style> tags is pure CSS.
-#  Sections are clearly commented for easy editing.
 # ─────────────────────────────────────────────
 st.markdown("""
 <style>
 
-/* ── 1. HIDE DEFAULT STREAMLIT CHROME ─────────────────────────────────────
-   Removes the top header bar, the footer "Made with Streamlit" bar,
-   the hamburger/kebab menu button, and the deploy button.
-   These selectors target Streamlit's internal DOM structure and may need
-   updating if Streamlit releases a major version change.
-   ────────────────────────────────────────────────────────────────────── */
+/* ── 1. HIDE DEFAULT STREAMLIT CHROME ─────── */
 #MainMenu,
 header[data-testid="stHeader"],
 footer,
@@ -34,10 +29,7 @@ footer,
     visibility: hidden !important;
 }
 
-/* ── 2. GLOBAL RESET & PAPER-TONE BACKGROUND ──────────────────────────────
-   Sets the warm ivory/paper background across every surface Streamlit
-   creates: the root, the app view container, and the main block wrapper.
-   ────────────────────────────────────────────────────────────────────── */
+/* ── 2. PAPER-TONE BACKGROUND ──────────────── */
 html,
 body,
 [data-testid="stAppViewContainer"],
@@ -49,11 +41,7 @@ body,
     padding: 0;
 }
 
-/* ── 3. BLOCK CONTAINER — VERTICAL OFFSET ─────────────────────────────────
-   The content sits roughly 25–30 % from the top (via padding-top),
-   rather than being vertically centred, so the lower half breathes.
-   max-width keeps the column narrow for a book-page feeling.
-   ────────────────────────────────────────────────────────────────────── */
+/* ── 3. BLOCK CONTAINER — VERTICAL OFFSET ─── */
 .block-container {
     max-width: 640px !important;
     padding-top: 18vh !important;
@@ -62,11 +50,7 @@ body,
     padding-right: 2rem !important;
 }
 
-/* ── 4. GLOBAL TYPOGRAPHY ─────────────────────────────────────────────────
-   Force an elegant serif stack everywhere. Georgia is universally
-   available; Playfair Display would require a Google Fonts import (added
-   below) and falls back gracefully.
-   ────────────────────────────────────────────────────────────────────── */
+/* ── 4. GOOGLE FONT IMPORT + GLOBAL TYPOGRAPHY */
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&display=swap');
 
 * {
@@ -76,32 +60,23 @@ body,
     text-rendering: optimizeLegibility;
 }
 
-/* ── 5. ALL TEXT ELEMENTS — CENTRED ───────────────────────────────────────
-   Every paragraph, heading, and custom element aligns to the centre.
-   ────────────────────────────────────────────────────────────────────── */
+/* ── 5. CENTRED TEXT ───────────────────────── */
 p, h1, h2, h3, h4, h5, h6,
 .stMarkdown, .stMarkdown p {
     text-align: center !important;
 }
 
-/* ── 6. AUDIO PLAYER — MINIMAL & CENTRED ─────────────────────────────────
-   The native <audio> element is display-blocked and centred.
-   We strip aggressive browser chrome where possible via accent-color.
-   ────────────────────────────────────────────────────────────────────── */
+/* ── 6. AUDIO PLAYER ───────────────────────── */
 audio {
     display: block !important;
     margin: 0 auto !important;
     width: 100% !important;
     max-width: 420px !important;
-    accent-color: #9B8B75 !important;   /* warm sepia tone for controls */
+    accent-color: #9B8B75 !important;
     opacity: 0.85;
 }
 
-/* ── 7. FADE-IN KEYFRAMES ─────────────────────────────────────────────────
-   A single reusable keyframe: element starts invisible and 4px below
-   its resting position, then floats up while fading in.
-   The subtle translateY lift gives a "breath" or "emerging" quality.
-   ────────────────────────────────────────────────────────────────────── */
+/* ── 7. FADE-IN KEYFRAMES ──────────────────── */
 @keyframes fadeUp {
     from {
         opacity: 0;
@@ -113,39 +88,17 @@ audio {
     }
 }
 
-/* ── 8. STAGGERED ANIMATION CLASSES ──────────────────────────────────────
-   Each content tier has its own delay.
-   animation-fill-mode: both   → element stays invisible before its delay
-                                  and stays visible after the animation ends.
-   ────────────────────────────────────────────────────────────────────── */
+/* ── 8. STAGGERED ANIMATION DELAYS ─────────── */
+.anim-title    { animation: fadeUp 1.6s ease-out 0.5s both; }
+.anim-subtitle { animation: fadeUp 1.6s ease-out 2.0s both; }
+.anim-player   { animation: fadeUp 1.4s ease-out 3.5s both; }
+.anim-footnote { animation: fadeUp 1.2s ease-out 4.0s both; }
 
-/* Title  — starts fading in at 0.5 s */
-.anim-title {
-    animation: fadeUp 1.6s ease-out 0.5s both;
-}
+/* ── 9. COMPONENT TYPOGRAPHY ───────────────── */
 
-/* Subtitle — starts at 2.0 s */
-.anim-subtitle {
-    animation: fadeUp 1.6s ease-out 2.0s both;
-}
-
-/* Track info + audio player — start at 3.5 s */
-.anim-player {
-    animation: fadeUp 1.4s ease-out 3.5s both;
-}
-
-/* Footnote — starts at 4.0 s */
-.anim-footnote {
-    animation: fadeUp 1.2s ease-out 4.0s both;
-}
-
-/* ── 9. COMPONENT-SPECIFIC TYPOGRAPHY ────────────────────────────────────
-   Fine-tuned sizes, weights, and spacing for each element tier.
-   ────────────────────────────────────────────────────────────────────── */
-
-/* Title */
+/* Title — fixed px for reliability on mobile */
 .title-text {
-    font-size: clamp(3.2rem, 9vw, 4.5rem);
+    font-size: 52px;
     font-weight: 500;
     letter-spacing: 0.06em;
     color: #333333;
@@ -155,7 +108,7 @@ audio {
 
 /* Subtitle */
 .subtitle-text {
-    font-size: clamp(1rem, 2.4vw, 1.25rem);
+    font-size: 18px;
     font-style: italic;
     font-weight: 400;
     color: #6A6A6A;
@@ -164,18 +117,17 @@ audio {
     line-height: 1.6;
 }
 
-/* Track / composer info */
+/* Track / composer info — deliberately small and muted */
 .track-text {
-    font-size: clamp(0.6rem, 1.2vw, 0.72rem);
+    font-size: 11px;
     font-weight: 400;
-    color: #9B9083;          /* noticeably muted — secondary hierarchy */
+    color: #9B9083;
     letter-spacing: 0.08em;
-    text-transform: none;
     margin-bottom: 0.55rem;
     line-height: 1.5;
 }
 
-/* Decorative thin rule between subtitle and player block */
+/* Thin decorative rule */
 .divider {
     width: 36px;
     height: 1px;
@@ -183,17 +135,18 @@ audio {
     margin: 0 auto 2.4rem auto;
 }
 
-/* Footnote */
+/* Footnote — fixed to bottom of viewport */
 .footnote-text {
-    font-size: 0.55rem;
+    font-size: 9px;
     color: #B8B0A5;
-    letter-spacing: 0.45em;
+    letter-spacing: 0.55em;
     text-transform: uppercase;
     position: fixed;
     bottom: 1.8rem;
     left: 0;
     right: 0;
     text-align: center;
+    margin: 0;
 }
 
 </style>
@@ -201,44 +154,25 @@ audio {
 
 
 # ─────────────────────────────────────────────
-#  AUDIO FILE PATH
-#
-#  Place your .mp3 file at:   assets/brahms_op118_no2.mp3
-#  (relative to where you run `streamlit run app.py`)
-#
-#  The folder structure should look like:
-#
-#    your-project/
-#    ├── app.py
-#    └── assets/
-#        └── brahms_op118_no2.mp3   ← put the mp3 here
-#
-#  If the file is absent, the audio element is simply hidden
-#  so the page still renders cleanly during development.
+#  AUDIO
+#  Put your mp3 at:  assets/brahms_op118_no2.mp3
 # ─────────────────────────────────────────────
 AUDIO_PATH = "assets/brahms_op118_no2.mp3"
-
-import os
 
 audio_html = ""
 if os.path.exists(AUDIO_PATH):
     with open(AUDIO_PATH, "rb") as f:
         audio_bytes = f.read()
-    import base64
     audio_b64 = base64.b64encode(audio_bytes).decode()
     audio_html = f"""
     <audio controls preload="metadata">
       <source src="data:audio/mpeg;base64,{audio_b64}" type="audio/mpeg">
     </audio>
     """
-else:
-    # Placeholder: invisible block that reserves space gracefully
-        audio_html = ""
-    """
 
 
 # ─────────────────────────────────────────────
-#  PAGE CONTENT  (HTML injected via st.markdown)
+#  PAGE CONTENT
 # ─────────────────────────────────────────────
 st.markdown(f"""
 
@@ -252,14 +186,14 @@ st.markdown(f"""
     <p class="subtitle-text">An intermezzo before the pages ahead.</p>
 </div>
 
-<!-- ③ TRACK INFO + ④ AUDIO PLAYER  (share the same animation tier) -->
+<!-- ③ TRACK INFO + ④ AUDIO PLAYER -->
 <div class="anim-player">
     <div class="divider"></div>
     <p class="track-text">Brahms: Intermezzo Op. 118, No. 2 (1893)</p>
     {audio_html}
 </div>
 
-<!-- ⑤ FOOTNOTE -->
+<!-- ⑤ FOOTNOTE — fixed to bottom -->
 <div class="anim-footnote">
     <p class="footnote-text">Douglas</p>
 </div>
