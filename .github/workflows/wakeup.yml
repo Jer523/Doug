@@ -1,1 +1,16 @@
- 
+ name: Keep Douglas Awake
+
+on:
+  schedule:
+    - cron: '0 4,10,16,22 * * *'
+  workflow_dispatch:
+
+jobs:
+  wake-up:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Douglas
+        run: |
+          echo "正在访问 Douglas..."
+          curl -s -L https://你的Douglas网址.streamlit.app/ > /dev/null
+          echo "完成"
