@@ -1,6 +1,4 @@
 import streamlit as st
-import os
-import base64
 
 st.set_page_config(
     page_title="CHAPTER 48",
@@ -12,13 +10,9 @@ st.set_page_config(
 # ─────────────────────────────────────────────
 #  AUDIO
 # ─────────────────────────────────────────────
-AUDIO_PATH = "assets/brahms_op118_no2.mp3"
-
-audio_tag = ""
-if os.path.exists(AUDIO_PATH):
-    with open(AUDIO_PATH, "rb") as f:
-        audio_b64 = base64.b64encode(f.read()).decode()
-    audio_tag = f'<audio controls preload="metadata" style="display:block;width:100%;max-width:380px;margin:0 auto;accent-color:#9B8B75;opacity:0.85;"><source src="data:audio/mpeg;base64,{audio_b64}" type="audio/mpeg"></audio>'
+DRIVE_ID = "1qPomRpWiNnTsRQ0X85pybCh-LOMDGnuZ"
+audio_url = f"https://drive.google.com/uc?export=download&id={DRIVE_ID}"
+audio_tag = f'<audio controls preload="none" style="display:block;width:100%;max-width:380px;margin:0 auto;accent-color:#9B8B75;opacity:0.85;"><source src="{audio_url}" type="audio/mpeg"></audio>'
 
 # ─────────────────────────────────────────────
 st.markdown(f"""
