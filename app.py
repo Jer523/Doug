@@ -145,7 +145,7 @@ components.html(f"""
 
   <div class="page">
 
-    <p class="title">CHAPTER 48</p>
+    <p class="title">Chapter 48</p>
 
     <p class="subtitle">An intermezzo before the pages ahead</p>
 
