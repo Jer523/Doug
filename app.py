@@ -2,9 +2,6 @@ import streamlit as st
 import os
 import base64
 
-# ─────────────────────────────────────────────
-#  Page config
-# ─────────────────────────────────────────────
 st.set_page_config(
     page_title="Chapter 48",
     page_icon="🎵",
@@ -13,189 +10,155 @@ st.set_page_config(
 )
 
 # ─────────────────────────────────────────────
-#  CSS INJECTION
+#  AUDIO
 # ─────────────────────────────────────────────
-st.markdown("""
+AUDIO_PATH = "assets/brahms_op118_no2.mp3"
+
+audio_tag = ""
+if os.path.exists(AUDIO_PATH):
+    with open(AUDIO_PATH, "rb") as f:
+        audio_b64 = base64.b64encode(f.read()).decode()
+    audio_tag = f'<audio controls preload="metadata" style="display:block;width:100%;max-width:380px;margin:0 auto;accent-color:#9B8B75;opacity:0.85;"><source src="data:audio/mpeg;base64,{audio_b64}" type="audio/mpeg"></audio>'
+
+# ─────────────────────────────────────────────
+#  FULL PAGE via components.html
+#  This bypasses Streamlit's iframe sandbox entirely,
+#  giving us full CSS control including fixed positioning.
+# ─────────────────────────────────────────────
+import streamlit.components.v1 as components
+
+components.html(f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&display=swap" rel="stylesheet">
 <style>
 
-/* ── 1. HIDE DEFAULT STREAMLIT CHROME ─────── */
-#MainMenu,
-header[data-testid="stHeader"],
-footer,
-[data-testid="stToolbar"],
-[data-testid="stDecoration"],
-[data-testid="stStatusWidget"] {
-    display: none !important;
-    visibility: hidden !important;
-}
-
-/* ── 2. PAPER-TONE BACKGROUND ──────────────── */
-html,
-body,
-[data-testid="stAppViewContainer"],
-[data-testid="stAppViewBlockContainer"],
-.main,
-.block-container {
-    background-color: #FDFBF7 !important;
+  * {{
     margin: 0;
     padding: 0;
-}
+    box-sizing: border-box;
+  }}
 
-/* ── 3. BLOCK CONTAINER — VERTICAL OFFSET ─── */
-.block-container {
-    max-width: 640px !important;
-    padding-top: 18vh !important;
-    padding-bottom: 12vh !important;
-    padding-left: 2rem !important;
-    padding-right: 2rem !important;
-}
-
-/* ── 4. GOOGLE FONT IMPORT + GLOBAL TYPOGRAPHY */
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&display=swap');
-
-* {
-    font-family: 'Playfair Display', Georgia, 'Times New Roman', serif !important;
+  html, body {{
+    width: 100%;
+    height: 100%;
+    background-color: #FDFBF7;
+    font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
     color: #4A4A4A;
     -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility;
-}
+  }}
 
-/* ── 5. CENTRED TEXT ───────────────────────── */
-p, h1, h2, h3, h4, h5, h6,
-.stMarkdown, .stMarkdown p {
-    text-align: center !important;
-}
+  /* ── FADE-IN KEYFRAMES ── */
+  @keyframes fadeUp {{
+    from {{ opacity: 0; transform: translateY(7px); }}
+    to   {{ opacity: 1; transform: translateY(0);   }}
+  }}
 
-/* ── 6. AUDIO PLAYER ───────────────────────── */
-audio {
-    display: block !important;
-    margin: 0 auto !important;
-    width: 100% !important;
-    max-width: 420px !important;
-    accent-color: #9B8B75 !important;
-    opacity: 0.85;
-}
+  /* ── MAIN CONTENT BLOCK ── */
+  .page {{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 22vh 2rem 6rem 2rem;
+    max-width: 560px;
+    margin: 0 auto;
+  }}
 
-/* ── 7. FADE-IN KEYFRAMES ──────────────────── */
-@keyframes fadeUp {
-    from {
-        opacity: 0;
-        transform: translateY(6px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* ── 8. STAGGERED ANIMATION DELAYS ─────────── */
-.anim-title    { animation: fadeUp 1.6s ease-out 0.5s both; }
-.anim-subtitle { animation: fadeUp 1.6s ease-out 2.0s both; }
-.anim-player   { animation: fadeUp 1.4s ease-out 3.5s both; }
-.anim-footnote { animation: fadeUp 1.2s ease-out 4.0s both; }
-
-/* ── 9. COMPONENT TYPOGRAPHY ───────────────── */
-
-/* Title — fixed px for reliability on mobile */
-.title-text {
-    font-size: 52px;
+  /* ── TITLE ── */
+  .title {{
+    font-size: 72px;
     font-weight: 500;
-    letter-spacing: 0.06em;
-    color: #333333;
-    margin-bottom: 0.5rem;
-    line-height: 1.15;
-}
+    letter-spacing: 0.05em;
+    color: #2E2E2E;
+    line-height: 1.1;
+    margin-bottom: 1rem;
+    animation: fadeUp 1.6s ease-out 0.5s both;
+  }}
 
-/* Subtitle */
-.subtitle-text {
-    font-size: 18px;
+  /* ── SUBTITLE ── */
+  .subtitle {{
+    font-size: 20px;
     font-style: italic;
     font-weight: 400;
     color: #6A6A6A;
     letter-spacing: 0.02em;
-    margin-bottom: 2.8rem;
     line-height: 1.6;
-}
+    margin-bottom: 3rem;
+    animation: fadeUp 1.6s ease-out 2.0s both;
+  }}
 
-/* Track / composer info — deliberately small and muted */
-.track-text {
-    font-size: 11px;
-    font-weight: 400;
-    color: #9B9083;
-    letter-spacing: 0.08em;
-    margin-bottom: 0.55rem;
-    line-height: 1.5;
-}
+  /* ── PLAYER BLOCK (track info + audio) ── */
+  .player-block {{
+    width: 100%;
+    animation: fadeUp 1.4s ease-out 3.5s both;
+  }}
 
-/* Thin decorative rule */
-.divider {
+  /* ── DIVIDER ── */
+  .divider {{
     width: 36px;
     height: 1px;
     background-color: #C8BFB0;
-    margin: 0 auto 2.4rem auto;
-}
+    margin: 0 auto 2rem auto;
+  }}
 
-/* Footnote — fixed to bottom of viewport */
-.footnote-text {
-    font-size: 9px;
-    color: #B8B0A5;
-    letter-spacing: 0.55em;
-    text-transform: uppercase;
+  /* ── TRACK INFO ── */
+  .track {{
+    font-size: 12px;
+    color: #9B9083;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.8rem;
+    line-height: 1.6;
+  }}
+
+  /* ── AUDIO ELEMENT ── */
+  audio {{
+    display: block;
+    width: 100%;
+    max-width: 380px;
+    margin: 0 auto;
+    accent-color: #9B8B75;
+    opacity: 0.85;
+  }}
+
+  /* ── FOOTNOTE — fixed to bottom ── */
+  .footnote {{
     position: fixed;
-    bottom: 1.8rem;
+    bottom: 1.6rem;
     left: 0;
     right: 0;
     text-align: center;
-    margin: 0;
-}
+    font-size: 9px;
+    color: #C0B8B0;
+    letter-spacing: 0.6em;
+    text-transform: uppercase;
+    animation: fadeUp 1.2s ease-out 4.0s both;
+  }}
 
 </style>
-""", unsafe_allow_html=True)
+</head>
+<body>
 
+  <div class="page">
 
-# ─────────────────────────────────────────────
-#  AUDIO
-#  Put your mp3 at:  assets/brahms_op118_no2.mp3
-# ─────────────────────────────────────────────
-AUDIO_PATH = "assets/brahms_op118_no2.mp3"
+    <p class="title">Chapter 48</p>
 
-audio_html = ""
-if os.path.exists(AUDIO_PATH):
-    with open(AUDIO_PATH, "rb") as f:
-        audio_bytes = f.read()
-    audio_b64 = base64.b64encode(audio_bytes).decode()
-    audio_html = f"""
-    <audio controls preload="metadata">
-      <source src="data:audio/mpeg;base64,{audio_b64}" type="audio/mpeg">
-    </audio>
-    """
+    <p class="subtitle">An intermezzo before the pages ahead.</p>
 
+    <div class="player-block">
+      <div class="divider"></div>
+      <p class="track">Brahms: Intermezzo Op. 118, No. 2 (1893)</p>
+      {audio_tag}
+    </div>
 
-# ─────────────────────────────────────────────
-#  PAGE CONTENT
-# ─────────────────────────────────────────────
-st.markdown(f"""
+  </div>
 
-<!-- ① TITLE -->
-<div class="anim-title">
-    <p class="title-text">Chapter 48</p>
-</div>
+  <p class="footnote">Douglas</p>
 
-<!-- ② SUBTITLE -->
-<div class="anim-subtitle">
-    <p class="subtitle-text">An intermezzo before the pages ahead.</p>
-</div>
-
-<!-- ③ TRACK INFO + ④ AUDIO PLAYER -->
-<div class="anim-player">
-    <div class="divider"></div>
-    <p class="track-text">Brahms: Intermezzo Op. 118, No. 2 (1893)</p>
-    {audio_html}
-</div>
-
-<!-- ⑤ FOOTNOTE — fixed to bottom -->
-<div class="anim-footnote">
-    <p class="footnote-text">Douglas</p>
-</div>
-
-""", unsafe_allow_html=True)
+</body>
+</html>
+""", height=700, scrolling=False)
