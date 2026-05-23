@@ -96,7 +96,7 @@ HTML = """
     line-height:1.6;
   }
 
-  /* Visualizer row — padding-left = player padding-left + btn width + gap */
+  /* Visualizer: same left-edge as progress bar */
   .viz-wrap {
     width:100%;
     max-width:270px;
@@ -223,7 +223,6 @@ HTML = """
         </div>
       </div>
     </div>
-
   </div>
 </div>
 
@@ -251,18 +250,17 @@ HTML = """
     try {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 256;               // 128 frequency bins
-      analyser.smoothingTimeConstant = 0.8;
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.6;
       const source = audioCtx.createMediaElementSource(audio);
       source.connect(analyser);
       analyser.connect(audioCtx.destination);
-      dataArray = new Uint8Array(analyser.frequencyBinCount); // 128
+      dataArray = new Uint8Array(analyser.frequencyBinCount); // 128 bins
     } catch(e) {
       console.warn('Web Audio unavailable:', e);
     }
   }
 
-  // ── helpers ──
   function fmt(s) {
     if (!isFinite(s) || isNaN(s) || s < 0) return '';
     return Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0');
@@ -281,7 +279,6 @@ HTML = """
     scrubber.style.left = (pct*100) + '%';
   }
 
-  // ── play/pause ──
   document.getElementById('play-btn').addEventListener('click', () => {
     initWebAudio();
     if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
@@ -294,7 +291,6 @@ HTML = """
     if (audio.duration) updateProgress(audio.currentTime / audio.duration);
   });
 
-  // ── seek ──
   function progressPct(e) {
     const rect = progressWrap.getBoundingClientRect();
     const x = e.touches ? e.touches[0].clientX : e.clientX;
@@ -319,16 +315,17 @@ HTML = """
   const canvas = document.getElementById('viz-canvas');
   const ctx    = canvas.getContext('2d');
 
-  const BAR_COUNT = 28;
-  const BAR_W     = 4;
-  const BAR_GAP   = 3;
+  const BAR_COUNT = 44;       // total bars
+  const HALF      = BAR_COUNT / 2;  // 22 per side
+  const BAR_W     = 3;
+  const BAR_GAP   = 2;
   const MAX_H     = 24;
   const MIN_H     = 2;
 
   const bars = Array.from({length: BAR_COUNT}, () => ({
     h: MIN_H,
     target: MIN_H,
-    speed: 0.18 + Math.random() * 0.1
+    speed: 0.18 + Math.random() * 0.08
   }));
 
   if (!CanvasRenderingContext2D.prototype.roundRect) {
@@ -347,7 +344,6 @@ HTML = """
   resizeCanvas();
   window.addEventListener('resize', resizeCanvas);
 
-  // Fallback random targets when Web Audio not ready
   let tickCount = 0;
 
   function drawViz() {
@@ -360,30 +356,37 @@ HTML = """
 
     if (playing) {
       if (analyser && dataArray) {
-        // Real frequency data: spread 28 bars across bins 0..79 (bass→mid-high)
         analyser.getByteFrequencyData(dataArray);
-        for (let i = 0; i < BAR_COUNT; i++) {
-          const binIndex = Math.round(i * 79 / (BAR_COUNT - 1));
-          const norm = dataArray[binIndex] / 255;
-          // Boost quiet signal so all bars move noticeably
-          const boosted = Math.min(1, norm * 1.8);
-          bars[i].target = MIN_H + boosted * (MAX_H - MIN_H);
+        // Mirror from centre: bar index 0 = innermost (low freq), HALF-1 = outermost (high freq)
+        // Left half: bars[HALF-1-i] | Right half: bars[HALF+i]
+        // Use log-ish mapping so low-freq bins (where piano lives) get more bars
+        for (let i = 0; i < HALF; i++) {
+          // Log scale: concentrate more bars in lower bins
+          const t = i / (HALF - 1);                          // 0..1
+          const binIndex = Math.round(Math.pow(t, 0.6) * 90); // bins 0..90, log-ish
+          const raw  = dataArray[binIndex] / 255;
+          // Strong boost so quiet passages still show movement
+          const boosted = Math.min(1, raw * 3.5);
+          const target  = MIN_H + boosted * (MAX_H - MIN_H);
+
+          bars[HALF - 1 - i].target = target; // left side (innermost = center)
+          bars[HALF + i].target     = target; // right side
         }
       } else {
-        // Fallback: random animation if Web Audio not yet initialised
+        // Fallback random until Web Audio ready
         tickCount++;
-        if (tickCount >= 8) {
+        if (tickCount >= 6) {
           tickCount = 0;
-          for (let i = 0; i < BAR_COUNT; i++) {
+          for (let i = 0; i < HALF; i++) {
             const r = Math.random();
-            bars[i].target = MIN_H + r * (MAX_H - MIN_H);
+            const t = MIN_H + r * (MAX_H - MIN_H);
+            bars[HALF - 1 - i].target = t;
+            bars[HALF + i].target     = t;
           }
         }
       }
     } else {
-      for (let i = 0; i < BAR_COUNT; i++) {
-        bars[i].target = MIN_H;
-      }
+      for (let i = 0; i < BAR_COUNT; i++) bars[i].target = MIN_H;
     }
 
     const totalW = BAR_COUNT * BAR_W + (BAR_COUNT - 1) * BAR_GAP;
