@@ -10,8 +10,7 @@ st.set_page_config(
 # ─────────────────────────────────────────────
 #  AUDIO
 # ─────────────────────────────────────────────
-DRIVE_ID = "1qPomRpWiNnTsRQ0X85pybCh-LOMDGnuZ"
-audio_url = f"https://drive.google.com/uc?export=download&id={DRIVE_ID}"
+audio_url = "https://raw.githubusercontent.com/Jer523/Douglas/main/assets/brahms_op118_no2.mp3"
 audio_tag = f'<audio controls preload="none" style="display:block;width:100%;max-width:380px;margin:0 auto;accent-color:#9B8B75;opacity:0.85;"><source src="{audio_url}" type="audio/mpeg"></audio>'
 
 # ─────────────────────────────────────────────
