@@ -23,7 +23,7 @@ html, body,
 </style>
 """, unsafe_allow_html=True)
 
-AUDIO_URL = "https://raw.githubusercontent.com/Jer523/Douglas/main/assets/brahms_op118_no2.mp3"
+AUDIO_URL = "https://raw.githubusercontent.com/Jer523/Douglas/main/assets/brahms_op118_no2.mp3.mp3"
 
 components.html(f"""
 <!DOCTYPE html>
