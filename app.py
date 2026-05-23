@@ -71,7 +71,7 @@ components.html(f"""
 
   /* ── TITLE ── */
   .title {{
-    font-size: 40px;
+    font-size: 50px;
     font-weight: 500;
     letter-spacing: 0.05em;
     color: #2E2E2E;
@@ -145,7 +145,7 @@ components.html(f"""
 
   <div class="page">
 
-    <p class="title">CHAPTER 48</p>
+    <p class="title">Chapter 48</p>
 
     <p class="subtitle">An intermezzo before the pages ahead</p>
 
