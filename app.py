@@ -146,7 +146,7 @@ st.markdown(f"""
     font-size: 9px;
     font-family: 'Playfair Display', Georgia, serif;
     color: #C0B8B0;
-    letter-spacing: 1.6em;
+    letter-spacing: 2em;
     text-transform: uppercase;
     z-index: 99999;
     animation: fadeUp 1.2s ease-out 3.5s both;
