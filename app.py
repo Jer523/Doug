@@ -82,7 +82,7 @@ components.html(f"""
 
   /* ── SUBTITLE ── */
   .subtitle {{
-    font-size: 18px;
+    font-size: 14px;
     font-style: italic;
     font-weight: 400;
     color: #6A6A6A;
