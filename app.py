@@ -56,9 +56,10 @@ components.html(f"""
     box-sizing: border-box;
   }}
 
-  html, body {{
+    html, body {{
     width: 100%;
-    height: 100%;
+    height: 100vh;
+    overflow: hidden;
     background-color: #FDFBF7;
     font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
     color: #4A4A4A;
