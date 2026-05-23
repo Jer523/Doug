@@ -33,7 +33,12 @@ components.html(f"""
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&display=swap" rel="stylesheet">
 <style>
-  * {{ margin:0; padding:0; box-sizing:border-box; }}
+  * {{
+    margin:0; padding:0; box-sizing:border-box;
+    /* 3. 全局禁止文字选中 */
+    -webkit-user-select:none;
+    user-select:none;
+  }}
 
   html, body {{
     width:100%; height:100%;
@@ -124,12 +129,16 @@ components.html(f"""
   }}
   #play-btn svg {{ width:13px; height:13px; fill:#7A6E65; }}
 
+  /* 进度条区域 */
   .progress-wrap {{
     flex:1;
     position:relative;
-    height:20px;
+    /* 2. 加大感应高度 */
+    height:44px;
     display:flex;
     align-items:center;
+    cursor:pointer;
+    touch-action:none;
   }}
 
   .progress-track {{
@@ -138,7 +147,7 @@ components.html(f"""
     background:#DDD6CE;
     position:relative;
     border-radius:1px;
-    touch-action:none;
+    pointer-events:none;
   }}
 
   #progress-fill {{
@@ -146,7 +155,6 @@ components.html(f"""
     width:0%;
     background:#9B8B75;
     border-radius:1px;
-    pointer-events:none;
   }}
 
   #scrubber {{
@@ -156,12 +164,11 @@ components.html(f"""
     width:9px; height:9px;
     border-radius:50%;
     background:#9B8B75;
-    pointer-events:none;
   }}
 
   #time-tooltip {{
     position:absolute;
-    top:-20px;
+    top:2px;
     left:0%;
     transform:translateX(-50%);
     font-size:9px;
@@ -172,14 +179,14 @@ components.html(f"""
     pointer-events:none;
   }}
 
-  /* ── 音量：用原生 range 横条，套在右侧小区域 ── */
+  /* 1. 音量：用 JS 自绘竖条，完全绕开 input[range] 的手机兼容问题 */
   .vol-wrap {{
     flex-shrink:0;
     display:flex;
     flex-direction:column;
     align-items:center;
     gap:5px;
-    width:18px;
+    width:20px;
   }}
 
   .vol-icon svg {{
@@ -188,42 +195,34 @@ components.html(f"""
     display:block;
   }}
 
-  /* 用 rotate 把横条变成竖条，兼容所有手机浏览器 */
-  .vol-rotate-wrap {{
-    width:18px;
+  /* 竖向音量轨道 */
+  #vol-track {{
+    width:1px;
     height:52px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    overflow:visible;
-  }}
-
-  #vol-slider {{
-    -webkit-appearance:none;
-    appearance:none;
-    width:52px;
-    height:2px;
     background:#DDD6CE;
-    outline:none;
-    border:none;
+    position:relative;
     cursor:pointer;
-    transform:rotate(-90deg);
-    transform-origin:center center;
-    accent-color:#9B8B75;
     touch-action:none;
   }}
-  #vol-slider::-webkit-slider-thumb {{
-    -webkit-appearance:none;
-    width:9px; height:9px;
-    border-radius:50%;
+
+  #vol-fill {{
+    position:absolute;
+    bottom:0; left:0;
+    width:100%;
     background:#9B8B75;
-    cursor:pointer;
+    border-radius:1px;
   }}
-  #vol-slider::-moz-range-thumb {{
+
+  #vol-thumb {{
+    position:absolute;
+    left:50%;
+    transform:translate(-50%, 50%);
     width:9px; height:9px;
     border-radius:50%;
     background:#9B8B75;
-    border:none;
+    /* 加大感应区域 */
+    padding:8px;
+    margin:-8px;
     cursor:pointer;
   }}
 
@@ -263,9 +262,9 @@ components.html(f"""
         </svg>
       </button>
 
-      <div class="progress-wrap">
+      <div class="progress-wrap" id="progress-wrap">
         <div id="time-tooltip"></div>
-        <div class="progress-track" id="progress-track">
+        <div class="progress-track">
           <div id="progress-fill"></div>
           <div id="scrubber"></div>
         </div>
@@ -275,8 +274,9 @@ components.html(f"""
         <span class="vol-icon">
           <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
         </span>
-        <div class="vol-rotate-wrap">
-          <input type="range" id="vol-slider" min="0" max="1" step="0.01" value="0.8">
+        <div id="vol-track">
+          <div id="vol-fill"></div>
+          <div id="vol-thumb"></div>
         </div>
       </div>
 
@@ -292,86 +292,101 @@ components.html(f"""
   const iconPause = document.getElementById('icon-pause');
   const fill      = document.getElementById('progress-fill');
   const scrubber  = document.getElementById('scrubber');
-  const trackEl   = document.getElementById('progress-track');
+  const progressWrap = document.getElementById('progress-wrap');
   const tooltip   = document.getElementById('time-tooltip');
-  const volSlider = document.getElementById('vol-slider');
-  const playBtn   = document.getElementById('play-btn');
+  const volTrack  = document.getElementById('vol-track');
+  const volFill   = document.getElementById('vol-fill');
+  const volThumb  = document.getElementById('vol-thumb');
 
-  audio.volume = 0.8;
+  let vol = 0.8;
+  audio.volume = vol;
+  setVolUI(vol);
+
   let tooltipTimer = null;
-  let dragging = false;
+  let draggingProgress = false;
+  let draggingVol = false;
 
+  // ── helpers ──
   function fmt(s) {{
     if (!isFinite(s) || isNaN(s) || s < 0) return '';
-    const m = Math.floor(s / 60);
-    const sec = String(Math.floor(s % 60)).padStart(2, '0');
-    return m + ':' + sec;
+    return Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0');
   }}
 
   function showTooltip(pct, t) {{
     const label = fmt(t);
     if (!label) return;
     tooltip.textContent = label;
-    const clamped = Math.max(5, Math.min(95, pct * 100));
-    tooltip.style.left = clamped + '%';
+    tooltip.style.left = Math.max(5, Math.min(95, pct*100)) + '%';
     tooltip.style.opacity = '1';
     clearTimeout(tooltipTimer);
-    tooltipTimer = setTimeout(() => tooltip.style.opacity = '0', 1500);
+    tooltipTimer = setTimeout(() => tooltip.style.opacity='0', 1500);
   }}
 
-  function updateBar(pct) {{
-    fill.style.width    = (pct * 100) + '%';
-    scrubber.style.left = (pct * 100) + '%';
+  function updateProgress(pct) {{
+    fill.style.width    = (pct*100) + '%';
+    scrubber.style.left = (pct*100) + '%';
   }}
 
-  // Play / pause
-  playBtn.addEventListener('click', () => {{
-    if (audio.paused) audio.play().catch(() => {{}});
-    else audio.pause();
+  function setVolUI(v) {{
+    const pct = Math.max(0, Math.min(1, v));
+    volFill.style.height = (pct*100) + '%';
+    volThumb.style.bottom = (pct*100) + '%';
+  }}
+
+  // ── play/pause ──
+  document.getElementById('play-btn').addEventListener('click', () => {{
+    audio.paused ? audio.play().catch(()=>{{}}) : audio.pause();
   }});
-
   audio.addEventListener('play',  () => {{ iconPlay.style.display='none';  iconPause.style.display='block'; }});
   audio.addEventListener('pause', () => {{ iconPlay.style.display='block'; iconPause.style.display='none';  }});
-  audio.addEventListener('ended', () => {{
-    iconPlay.style.display='block'; iconPause.style.display='none';
-    updateBar(0);
-  }});
+  audio.addEventListener('ended', () => {{ iconPlay.style.display='block'; iconPause.style.display='none'; updateProgress(0); }});
   audio.addEventListener('timeupdate', () => {{
-    if (audio.duration) updateBar(audio.currentTime / audio.duration);
+    if (audio.duration) updateProgress(audio.currentTime / audio.duration);
   }});
 
-  // Progress bar — touch-action:none on the element lets us capture smoothly
-  function pctFromEvent(e) {{
-    const rect = trackEl.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  // ── progress seek ──
+  function progressPct(e) {{
+    const rect = progressWrap.getBoundingClientRect();
+    const x = e.touches ? e.touches[0].clientX : e.clientX;
+    return Math.max(0, Math.min(1, (x - rect.left) / rect.width));
   }}
-
   function doSeek(e) {{
-    const pct = pctFromEvent(e);
-    updateBar(pct);
+    const pct = progressPct(e);
+    updateProgress(pct);
     if (audio.duration) {{
       audio.currentTime = pct * audio.duration;
       showTooltip(pct, audio.currentTime);
     }}
   }}
+  progressWrap.addEventListener('mousedown',  e => {{ draggingProgress=true; doSeek(e); e.preventDefault(); }});
+  progressWrap.addEventListener('touchstart', e => {{ draggingProgress=true; doSeek(e); }}, {{passive:true}});
+  window.addEventListener('mousemove',  e => {{ if(draggingProgress) doSeek(e); }});
+  window.addEventListener('touchmove',  e => {{ if(draggingProgress) doSeek(e); }}, {{passive:true}});
+  window.addEventListener('mouseup',    () => draggingProgress=false);
+  window.addEventListener('touchend',   () => {{ draggingProgress=false; draggingVol=false; }});
 
-  trackEl.addEventListener('mousedown',  e => {{ dragging = true; doSeek(e); e.preventDefault(); }});
-  trackEl.addEventListener('touchstart', e => {{ dragging = true; doSeek(e); }}, {{passive:true}});
-  window.addEventListener('mousemove',   e => {{ if (dragging) doSeek(e); }});
-  window.addEventListener('touchmove',   e => {{ if (dragging) doSeek(e); }}, {{passive:true}});
-  window.addEventListener('mouseup',     () => dragging = false);
-  window.addEventListener('touchend',    () => dragging = false);
+  // ── volume (custom JS vertical slider) ──
+  function volPct(e) {{
+    const rect = volTrack.getBoundingClientRect();
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    // bottom = max volume, top = min
+    return Math.max(0, Math.min(1, 1 - (y - rect.top) / rect.height));
+  }}
+  function doVol(e) {{
+    vol = volPct(e);
+    audio.volume = vol;
+    setVolUI(vol);
+  }}
+  volTrack.addEventListener('mousedown',  e => {{ draggingVol=true; doVol(e); e.preventDefault(); }});
+  volTrack.addEventListener('touchstart', e => {{ draggingVol=true; doVol(e); }}, {{passive:true}});
+  window.addEventListener('mousemove',  e => {{ if(draggingVol) doVol(e); }});
+  window.addEventListener('touchmove',  e => {{ if(draggingVol) doVol(e); }}, {{passive:true}});
+  window.addEventListener('mouseup',    () => draggingVol=false);
 
-  // Volume — native range handles touch natively, just read value
-  volSlider.addEventListener('input', () => {{
-    audio.volume = parseFloat(volSlider.value);
-  }});
-
-  // Stretch iframe
+  // ── stretch iframe ──
   try {{
     window.parent.document.querySelectorAll('iframe').forEach(f => {{
-      f.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:' + window.screen.height + 'px;border:none;z-index:99999;';
+      f.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:'+window.screen.height+'px;border:none;z-index:99999;';
     }});
   }} catch(e) {{}}
 </script>
