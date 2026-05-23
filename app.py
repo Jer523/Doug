@@ -153,10 +153,10 @@ components.html(f"""
   }}
 
 </style>
-html, body {{
-    height: 100vh;
-    overflow: hidden;
-}}
+    html, body {{
+        height: 100vh;
+        overflow: hidden;
+    }}
 
 </head>
 <body>
