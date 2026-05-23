@@ -100,7 +100,6 @@ components.html(f"""
     line-height:1.6;
   }}
 
-  /* ── 播放器整体 ── */
   .player-wrap {{
     width:100%;
     max-width:380px;
@@ -110,7 +109,6 @@ components.html(f"""
     gap:14px;
   }}
 
-  /* ── 播放/暂停按钮 ── */
   #play-btn {{
     flex-shrink:0;
     width:36px; height:36px;
@@ -122,10 +120,10 @@ components.html(f"""
     align-items:center;
     justify-content:center;
     padding:0;
+    -webkit-tap-highlight-color:transparent;
   }}
   #play-btn svg {{ width:13px; height:13px; fill:#7A6E65; }}
 
-  /* ── 进度条 ── */
   .progress-wrap {{
     flex:1;
     position:relative;
@@ -139,8 +137,8 @@ components.html(f"""
     height:1px;
     background:#DDD6CE;
     position:relative;
-    cursor:pointer;
     border-radius:1px;
+    touch-action:none;
   }}
 
   #progress-fill {{
@@ -155,16 +153,15 @@ components.html(f"""
     position:absolute;
     top:50%; left:0%;
     transform:translate(-50%,-50%);
-    width:7px; height:7px;
+    width:9px; height:9px;
     border-radius:50%;
     background:#9B8B75;
     pointer-events:none;
   }}
 
-  /* ── tooltip ── */
   #time-tooltip {{
     position:absolute;
-    top:-18px;
+    top:-20px;
     left:0%;
     transform:translateX(-50%);
     font-size:9px;
@@ -175,14 +172,14 @@ components.html(f"""
     pointer-events:none;
   }}
 
-  /* ── 音量：垂直滑块容器 ── */
+  /* ── 音量：用原生 range 横条，套在右侧小区域 ── */
   .vol-wrap {{
     flex-shrink:0;
     display:flex;
     flex-direction:column;
     align-items:center;
-    gap:4px;
-    width:20px;
+    gap:5px;
+    width:18px;
   }}
 
   .vol-icon svg {{
@@ -191,19 +188,43 @@ components.html(f"""
     display:block;
   }}
 
-  /* 垂直音量滑块 */
+  /* 用 rotate 把横条变成竖条，兼容所有手机浏览器 */
+  .vol-rotate-wrap {{
+    width:18px;
+    height:52px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:visible;
+  }}
+
   #vol-slider {{
-    -webkit-appearance:slider-vertical;
-    writing-mode:vertical-lr;
-    direction:rtl;
-    width:4px;
-    height:50px;
-    accent-color:#9B8B75;
-    cursor:pointer;
-    background:transparent;
+    -webkit-appearance:none;
+    appearance:none;
+    width:52px;
+    height:2px;
+    background:#DDD6CE;
     outline:none;
     border:none;
-    padding:0;
+    cursor:pointer;
+    transform:rotate(-90deg);
+    transform-origin:center center;
+    accent-color:#9B8B75;
+    touch-action:none;
+  }}
+  #vol-slider::-webkit-slider-thumb {{
+    -webkit-appearance:none;
+    width:9px; height:9px;
+    border-radius:50%;
+    background:#9B8B75;
+    cursor:pointer;
+  }}
+  #vol-slider::-moz-range-thumb {{
+    width:9px; height:9px;
+    border-radius:50%;
+    background:#9B8B75;
+    border:none;
+    cursor:pointer;
   }}
 
   .footnote {{
@@ -228,14 +249,13 @@ components.html(f"""
     <div class="divider"></div>
     <p class="track">Brahms: Intermezzo Op. 118, No. 2 (1893)</p>
 
-    <!-- 不加 crossorigin，避免 CORS 阻止播放 -->
     <audio id="audio-el" preload="none">
       <source src="{AUDIO_URL}" type="audio/mpeg">
     </audio>
 
     <div class="player-wrap">
 
-      <button id="play-btn" id="play-btn">
+      <button id="play-btn">
         <svg id="icon-play" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
         <svg id="icon-pause" viewBox="0 0 24 24" style="display:none">
           <rect x="5" y="3" width="4" height="18"/>
@@ -255,8 +275,9 @@ components.html(f"""
         <span class="vol-icon">
           <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
         </span>
-        <input type="range" id="vol-slider" min="0" max="1" step="0.05" value="0.8"
-               orient="vertical">
+        <div class="vol-rotate-wrap">
+          <input type="range" id="vol-slider" min="0" max="1" step="0.01" value="0.8">
+        </div>
       </div>
 
     </div>
@@ -266,7 +287,7 @@ components.html(f"""
 <p class="footnote">Douglas</p>
 
 <script>
-  const audio    = document.getElementById('audio-el');
+  const audio     = document.getElementById('audio-el');
   const iconPlay  = document.getElementById('icon-play');
   const iconPause = document.getElementById('icon-pause');
   const fill      = document.getElementById('progress-fill');
@@ -281,82 +302,76 @@ components.html(f"""
   let dragging = false;
 
   function fmt(s) {{
-    if (!isFinite(s) || isNaN(s)) return '';
-    const m = Math.floor(s/60);
-    const sec = String(Math.floor(s%60)).padStart(2,'0');
-    return m+':'+sec;
+    if (!isFinite(s) || isNaN(s) || s < 0) return '';
+    const m = Math.floor(s / 60);
+    const sec = String(Math.floor(s % 60)).padStart(2, '0');
+    return m + ':' + sec;
   }}
 
   function showTooltip(pct, t) {{
     const label = fmt(t);
     if (!label) return;
     tooltip.textContent = label;
-    // clamp so tooltip doesn't go off edges
-    const clamped = Math.max(0, Math.min(100, pct*100));
+    const clamped = Math.max(5, Math.min(95, pct * 100));
     tooltip.style.left = clamped + '%';
     tooltip.style.opacity = '1';
     clearTimeout(tooltipTimer);
     tooltipTimer = setTimeout(() => tooltip.style.opacity = '0', 1500);
   }}
 
-  // Play/pause
+  function updateBar(pct) {{
+    fill.style.width    = (pct * 100) + '%';
+    scrubber.style.left = (pct * 100) + '%';
+  }}
+
+  // Play / pause
   playBtn.addEventListener('click', () => {{
-    if (audio.paused) {{
-      audio.play().catch(err => console.log('play error:', err));
-    }} else {{
-      audio.pause();
-    }}
+    if (audio.paused) audio.play().catch(() => {{}});
+    else audio.pause();
   }});
 
-  audio.addEventListener('play', () => {{
-    iconPlay.style.display  = 'none';
-    iconPause.style.display = 'block';
-  }});
-  audio.addEventListener('pause', () => {{
-    iconPlay.style.display  = 'block';
-    iconPause.style.display = 'none';
-  }});
+  audio.addEventListener('play',  () => {{ iconPlay.style.display='none';  iconPause.style.display='block'; }});
+  audio.addEventListener('pause', () => {{ iconPlay.style.display='block'; iconPause.style.display='none';  }});
   audio.addEventListener('ended', () => {{
-    iconPlay.style.display  = 'block';
-    iconPause.style.display = 'none';
-    fill.style.width       = '0%';
-    scrubber.style.left    = '0%';
+    iconPlay.style.display='block'; iconPause.style.display='none';
+    updateBar(0);
   }});
-
-  // Progress update
   audio.addEventListener('timeupdate', () => {{
-    if (!audio.duration) return;
-    const pct = audio.currentTime / audio.duration;
-    fill.style.width    = (pct*100)+'%';
-    scrubber.style.left = (pct*100)+'%';
+    if (audio.duration) updateBar(audio.currentTime / audio.duration);
   }});
 
-  // Seek helpers
-  function getPct(e) {{
+  // Progress bar — touch-action:none on the element lets us capture smoothly
+  function pctFromEvent(e) {{
     const rect = trackEl.getBoundingClientRect();
-    const x = e.touches ? e.touches[0].clientX : e.clientX;
-    return Math.max(0, Math.min(1, (x - rect.left) / rect.width));
-  }}
-  function doSeek(pct) {{
-    if (!audio.duration) return;
-    audio.currentTime = pct * audio.duration;
-    showTooltip(pct, audio.currentTime);
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
   }}
 
-  trackEl.addEventListener('mousedown',  e => {{ dragging=true; doSeek(getPct(e)); e.preventDefault(); }});
-  trackEl.addEventListener('touchstart', e => {{ dragging=true; doSeek(getPct(e)); }}, {{passive:true}});
-  document.addEventListener('mousemove',  e => {{ if(dragging) doSeek(getPct(e)); }});
-  document.addEventListener('touchmove',  e => {{ if(dragging) doSeek(getPct(e)); }}, {{passive:true}});
-  document.addEventListener('mouseup',   () => dragging=false);
-  document.addEventListener('touchend',  () => dragging=false);
+  function doSeek(e) {{
+    const pct = pctFromEvent(e);
+    updateBar(pct);
+    if (audio.duration) {{
+      audio.currentTime = pct * audio.duration;
+      showTooltip(pct, audio.currentTime);
+    }}
+  }}
 
-  // Volume
-  volSlider.addEventListener('input', () => audio.volume = parseFloat(volSlider.value));
+  trackEl.addEventListener('mousedown',  e => {{ dragging = true; doSeek(e); e.preventDefault(); }});
+  trackEl.addEventListener('touchstart', e => {{ dragging = true; doSeek(e); }}, {{passive:true}});
+  window.addEventListener('mousemove',   e => {{ if (dragging) doSeek(e); }});
+  window.addEventListener('touchmove',   e => {{ if (dragging) doSeek(e); }}, {{passive:true}});
+  window.addEventListener('mouseup',     () => dragging = false);
+  window.addEventListener('touchend',    () => dragging = false);
 
-  // Stretch iframe to full screen height
+  // Volume — native range handles touch natively, just read value
+  volSlider.addEventListener('input', () => {{
+    audio.volume = parseFloat(volSlider.value);
+  }});
+
+  // Stretch iframe
   try {{
     window.parent.document.querySelectorAll('iframe').forEach(f => {{
-      f.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:'+window.screen.height+'px;border:none;z-index:99999;';
+      f.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:' + window.screen.height + 'px;border:none;z-index:99999;';
     }});
   }} catch(e) {{}}
 </script>
