@@ -88,7 +88,7 @@ st.markdown(f"""
 
   /* ── DIVIDER ── */
   #chapter-page .divider {{
-    width: 280px;
+    width: 270px;
     height: 1px;
     background-color: #C8BFB0;
     margin: 0 auto 2rem auto;
