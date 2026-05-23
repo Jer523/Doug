@@ -145,7 +145,7 @@ audio {
 
 /* Title */
 .title-text {
-    font-size: clamp(3.2rem, 100vw, 4.5rem);
+    font-size: clamp(3.2rem, 9vw, 4.5rem);
     font-weight: 500;
     letter-spacing: 0.06em;
     color: #333333;
@@ -166,7 +166,7 @@ audio {
 
 /* Track / composer info */
 .track-text {
-    font-size: clamp(0.7rem, 1.6vw, 0.82rem);
+    font-size: clamp(0.6rem, 1.2vw, 0.72rem);
     font-weight: 400;
     color: #9B9083;          /* noticeably muted — secondary hierarchy */
     letter-spacing: 0.08em;
@@ -185,11 +185,15 @@ audio {
 
 /* Footnote */
 .footnote-text {
-    font-size: 0.62rem;
+    font-size: 0.55rem;
     color: #B8B0A5;
-    letter-spacing: 0.22em;
+    letter-spacing: 0.45em;
     text-transform: uppercase;
-    margin-top: 3.8rem;
+    position: fixed;
+    bottom: 1.8rem;
+    left: 0;
+    right: 0;
+    text-align: center;
 }
 
 </style>
@@ -229,15 +233,7 @@ if os.path.exists(AUDIO_PATH):
     """
 else:
     # Placeholder: invisible block that reserves space gracefully
-    audio_html = """
-    <div style="
-        width:100%;
-        max-width:420px;
-        margin:0 auto;
-        height:40px;
-        border-bottom: 1px solid #D9D2C7;
-        opacity:0.4;
-    "></div>
+        audio_html = ""
     """
 
 
