@@ -38,6 +38,7 @@ components.html(f"""
     -webkit-user-select:none;
     user-select:none;
   }}
+
   html, body {{
     width:100%; height:100%;
     background:#FDFBF7;
@@ -46,5 +47,367 @@ components.html(f"""
     -webkit-font-smoothing:antialiased;
     overflow:hidden;
   }}
+
   @keyframes fadeUp {{
-    from {{ opacity:0; transform:translateY(14
+    from {{ opacity:0; transform:translateY(14px); }}
+    to   {{ opacity:1; transform:translateY(0); }}
+  }}
+
+  .page {{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    text-align:center;
+    padding:26vh 2rem 0 2rem;
+    max-width:560px;
+    margin:0 auto;
+  }}
+
+  .title {{
+    font-size:50px;
+    font-weight:500;
+    letter-spacing:0.05em;
+    color:#2E2E2E;
+    line-height:1.1;
+    margin-bottom:1rem;
+    animation:fadeUp 1.6s ease-out 0.5s both;
+  }}
+
+  .subtitle {{
+    font-size:15.6px;
+    font-style:italic;
+    color:#6A6A6A;
+    letter-spacing:0.02em;
+    line-height:1.6;
+    margin-bottom:3rem;
+    animation:fadeUp 1.6s ease-out 1.5s both;
+  }}
+
+  .player-block {{
+    width:100%;
+    max-width:420px;
+    animation:fadeUp 1.4s ease-out 2.5s both;
+  }}
+
+  .divider {{
+    width:260px;
+    height:1px;
+    background:#C8BFB0;
+    margin:0 auto 2rem auto;
+  }}
+
+  .track {{
+    font-size:12px;
+    color:#9B9083;
+    letter-spacing:0.08em;
+    margin-bottom:1.2rem;
+    line-height:1.6;
+  }}
+
+  /* ── Visualizer ── */
+  .viz-wrap {{
+    width:100%;
+    max-width:270px;
+    /* align with the progress bar: skip the button width + gap */
+    padding-left: calc(10px + 36px + 24px); /* player padding-left + btn width + gap */
+    margin:0 auto 10px auto;
+    box-sizing:border-box;
+  }}
+  #viz-canvas {{
+    display:block;
+    width:100%;
+    height:32px;
+  }}
+
+  /* ── Player row ── */
+  .player-wrap {{
+    width:100%;
+    max-width:270px;
+    margin:0 auto;
+    display:flex;
+    align-items:center;
+    gap:24px;          /* ← increased from 14px */
+    padding-left:10px; /* ← shift button right */
+  }}
+
+  #play-btn {{
+    flex-shrink:0;
+    width:36px; height:36px;
+    border-radius:50%;
+    border:1px solid #C8BFB0;
+    background:transparent;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:0;
+    -webkit-tap-highlight-color:transparent;
+  }}
+  #play-btn svg {{ width:13px; height:13px; fill:#7A6E65; }}
+
+  .progress-wrap {{
+    flex:1;
+    position:relative;
+    height:44px;
+    display:flex;
+    align-items:center;
+    cursor:pointer;
+    touch-action:none;
+  }}
+
+  .progress-track {{
+    width:100%;
+    height:1px;
+    background:#DDD6CE;
+    position:relative;
+    border-radius:1px;
+    pointer-events:none;
+  }}
+
+  #progress-fill {{
+    height:100%;
+    width:0%;
+    background:#9B8B75;
+    border-radius:1px;
+  }}
+
+  #scrubber {{
+    position:absolute;
+    top:50%; left:0%;
+    transform:translate(-50%,-50%);
+    width:9px; height:9px;
+    border-radius:50%;
+    background:#9B8B75;
+  }}
+
+  #time-tooltip {{
+    position:absolute;
+    top:2px;
+    left:0%;
+    transform:translateX(-50%);
+    font-size:9px;
+    color:#9B9083;
+    white-space:nowrap;
+    opacity:0;
+    transition:opacity 0.2s;
+    pointer-events:none;
+  }}
+
+  .vol-wrap {{
+    display:none; /* keep vol hidden as before */
+  }}
+
+  .footnote {{
+    position:fixed;
+    bottom:1.6rem;
+    left:0; right:0;
+    text-align:center;
+    font-size:9px;
+    color:#C0B8B0;
+    letter-spacing:2em;
+    text-transform:uppercase;
+    animation:fadeUp 1.2s ease-out 3.5s both;
+  }}
+</style>
+</head>
+<body>
+
+<div class="page">
+  <p class="title">Chapter 48</p>
+  <p class="subtitle">An intermezzo before the pages ahead</p>
+  <div class="player-block">
+    <div class="divider"></div>
+    <p class="track">Brahms: Intermezzo Op. 118, No. 2 (1893)</p>
+
+    <audio id="audio-el" preload="none">
+      <source src="{AUDIO_URL}" type="audio/mpeg">
+    </audio>
+
+    <!-- Visualizer sits above the player row, aligned with the progress bar -->
+    <div class="viz-wrap">
+      <canvas id="viz-canvas"></canvas>
+    </div>
+
+    <div class="player-wrap">
+      <button id="play-btn">
+        <svg id="icon-play" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+        <svg id="icon-pause" viewBox="0 0 24 24" style="display:none">
+          <rect x="5" y="3" width="4" height="18"/>
+          <rect x="15" y="3" width="4" height="18"/>
+        </svg>
+      </button>
+
+      <div class="progress-wrap" id="progress-wrap">
+        <div id="time-tooltip"></div>
+        <div class="progress-track">
+          <div id="progress-fill"></div>
+          <div id="scrubber"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="footnote">Douglas</p>
+
+<script>
+  const audio        = document.getElementById('audio-el');
+  const iconPlay     = document.getElementById('icon-play');
+  const iconPause    = document.getElementById('icon-pause');
+  const fill         = document.getElementById('progress-fill');
+  const scrubber     = document.getElementById('scrubber');
+  const progressWrap = document.getElementById('progress-wrap');
+  const tooltip      = document.getElementById('time-tooltip');
+
+  let tooltipTimer     = null;
+  let draggingProgress = false;
+
+  // ── helpers ──
+  function fmt(s) {{
+    if (!isFinite(s) || isNaN(s) || s < 0) return '';
+    return Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0');
+  }}
+  function showTooltip(pct, t) {{
+    const label = fmt(t);
+    if (!label) return;
+    tooltip.textContent = label;
+    tooltip.style.left = Math.max(5, Math.min(95, pct*100)) + '%';
+    tooltip.style.opacity = '1';
+    clearTimeout(tooltipTimer);
+    tooltipTimer = setTimeout(() => tooltip.style.opacity='0', 1500);
+  }}
+  function updateProgress(pct) {{
+    fill.style.width    = (pct*100) + '%';
+    scrubber.style.left = (pct*100) + '%';
+  }}
+
+  // ── play/pause ──
+  document.getElementById('play-btn').addEventListener('click', () => {{
+    audio.paused ? audio.play().catch(()=>{{}}) : audio.pause();
+  }});
+  audio.addEventListener('play',  () => {{ iconPlay.style.display='none';  iconPause.style.display='block'; }});
+  audio.addEventListener('pause', () => {{ iconPlay.style.display='block'; iconPause.style.display='none';  }});
+  audio.addEventListener('ended', () => {{ iconPlay.style.display='block'; iconPause.style.display='none'; updateProgress(0); }});
+  audio.addEventListener('timeupdate', () => {{
+    if (audio.duration) updateProgress(audio.currentTime / audio.duration);
+  }});
+
+  // ── progress seek ──
+  function progressPct(e) {{
+    const rect = progressWrap.getBoundingClientRect();
+    const x = e.touches ? e.touches[0].clientX : e.clientX;
+    return Math.max(0, Math.min(1, (x - rect.left) / rect.width));
+  }}
+  function doSeek(e) {{
+    const pct = progressPct(e);
+    updateProgress(pct);
+    if (audio.duration) {{
+      audio.currentTime = pct * audio.duration;
+      showTooltip(pct, audio.currentTime);
+    }}
+  }}
+  progressWrap.addEventListener('mousedown',  e => {{ draggingProgress=true; doSeek(e); e.preventDefault(); }});
+  progressWrap.addEventListener('touchstart', e => {{ draggingProgress=true; doSeek(e); }}, {{passive:true}});
+  window.addEventListener('mousemove',  e => {{ if(draggingProgress) doSeek(e); }});
+  window.addEventListener('touchmove',  e => {{ if(draggingProgress) doSeek(e); }}, {{passive:true}});
+  window.addEventListener('mouseup',    () => draggingProgress=false);
+  window.addEventListener('touchend',   () => {{ draggingProgress=false; }});
+
+  // ──────────────────────────────────────────
+  //  Music Visualizer
+  // ──────────────────────────────────────────
+  const canvas = document.getElementById('viz-canvas');
+  const ctx    = canvas.getContext('2d');
+
+  const BAR_COUNT  = 28;
+  const BAR_W      = 4;   // px (logical)
+  const BAR_GAP    = 3;   // px between bars
+  const MAX_H      = 26;  // maximum bar height px
+  const MIN_H      = 2;   // resting height px
+  const COLOR_BAR  = '#B8A898';
+  const COLOR_BG   = 'transparent';
+
+  // Each bar has a current height and a target height
+  const bars = Array.from({{length: BAR_COUNT}}, () => ({{
+    h: MIN_H,
+    target: MIN_H,
+    speed: 0.08 + Math.random() * 0.1,
+  }}));
+
+  let targetUpdateCounter = 0;
+
+  function resizeCanvas() {{
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width  = rect.width  * dpr;
+    canvas.height = 32          * dpr;
+    ctx.scale(dpr, dpr);
+  }}
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+
+  function drawViz() {{
+    const W = canvas.width  / (window.devicePixelRatio || 1);
+    const H = canvas.height / (window.devicePixelRatio || 1);
+    ctx.clearRect(0, 0, W, H);
+
+    const playing = !audio.paused && !audio.ended;
+
+    // Every ~8 frames, randomise targets for playing bars
+    targetUpdateCounter++;
+    if (targetUpdateCounter >= 8) {{
+      targetUpdateCounter = 0;
+      bars.forEach(b => {{
+        if (playing) {{
+          // Weighted random: more mid-range heights feel musical
+          const r = Math.random();
+          b.target = MIN_H + r * r * (MAX_H - MIN_H);
+        }} else {{
+          b.target = MIN_H;
+        }}
+      }});
+    }}
+
+    // Smooth interpolation
+    bars.forEach(b => {{
+      b.h += (b.target - b.h) * b.speed;
+      if (b.h < MIN_H) b.h = MIN_H;
+    }});
+
+    // Total width of all bars
+    const totalW = BAR_COUNT * BAR_W + (BAR_COUNT - 1) * BAR_GAP;
+    let x = (W - totalW) / 2;
+
+    bars.forEach(b => {{
+      const barH = Math.max(MIN_H, b.h);
+      // Draw bar centred vertically
+      const y = (H - barH) / 2;
+      ctx.fillStyle = COLOR_BAR;
+      ctx.beginPath();
+      ctx.roundRect(x, y, BAR_W, barH, 1);
+      ctx.fill();
+      x += BAR_W + BAR_GAP;
+    }});
+
+    requestAnimationFrame(drawViz);
+  }}
+
+  // roundRect polyfill for older Safari
+  if (!CanvasRenderingContext2D.prototype.roundRect) {{
+    CanvasRenderingContext2D.prototype.roundRect = function(x,y,w,h,r) {{
+      this.rect(x,y,w,h); // fallback: plain rect
+    }};
+  }}
+
+  drawViz();
+
+  // ── stretch iframe ──
+  try {{
+    window.parent.document.querySelectorAll('iframe').forEach(f => {{
+      f.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:'+window.screen.height+'px;border:none;z-index:99999;';
+    }});
+  }} catch(e) {{}}
+</script>
+</body>
+</html>
+""", height=900, scrolling=False)
