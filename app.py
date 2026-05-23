@@ -30,16 +30,6 @@ st.markdown(f"""
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&display=swap');
 
-  /* ── HIDE ALL STREAMLIT CHROME ── */
-  #MainMenu, header, footer,
-  [data-testid="stToolbar"],
-  [data-testid="stDecoration"],
-  [data-testid="stStatusWidget"],
-  [data-testid="stSidebarNav"],
-  section[data-testid="stSidebar"] {{
-    display: none !important;
-  }}
-
   /* ── KILL DEFAULT STREAMLIT BACKGROUND & PADDING ── */
   html, body,
   [data-testid="stAppViewContainer"],
