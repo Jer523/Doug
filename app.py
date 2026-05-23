@@ -127,7 +127,7 @@ components.html(f"""
     display:flex;
     align-items:center;
     gap:24px;          /* ← increased from 14px */
-    padding-left:0px; /* ← shift button right */
+    padding-left:5px; /* ← shift button right */
   }}
 
   #play-btn {{
