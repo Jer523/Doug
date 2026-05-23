@@ -71,7 +71,7 @@ components.html(f"""
 
   /* ── TITLE ── */
   .title {{
-    font-size: 48px;
+    font-size: 50px;
     font-weight: 500;
     letter-spacing: 0.05em;
     color: #2E2E2E;
@@ -82,7 +82,7 @@ components.html(f"""
 
   /* ── SUBTITLE ── */
   .subtitle {{
-    font-size: 20px;
+    font-size: 18px;
     font-style: italic;
     font-weight: 400;
     color: #6A6A6A;
