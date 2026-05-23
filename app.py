@@ -88,15 +88,15 @@ components.html(f"""
 
   /* 分割线 — 改 width 调长度 */
   .divider {{
-    width:80px;
+    width:260px;
     height:1px;
     background:#C8BFB0;
     margin:0 auto 2rem auto;
   }}
 
-  /* 曲名 — 改 font-size 调字号 */
+  /* 曲名 */
   .track {{
-    font-size:11px;
+    font-size:12px;
     color:#9B9083;
     letter-spacing:0.08em;
     margin-bottom:1.4rem;
