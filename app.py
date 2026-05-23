@@ -223,6 +223,16 @@ components.html(f"""
         </div>
       </div>
 
+      <div class="vol-wrap">
+        <span class="vol-icon">
+          <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+        </span>
+        <div id="vol-track">
+          <div id="vol-fill"></div>
+          <div id="vol-thumb"></div>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -307,6 +317,24 @@ components.html(f"""
   window.addEventListener('touchmove',  e => {{ if(draggingProgress) doSeek(e); }}, {{passive:true}});
   window.addEventListener('mouseup',    () => draggingProgress=false);
   window.addEventListener('touchend',   () => {{ draggingProgress=false; draggingVol=false; }});
+
+  // ── volume (custom JS vertical slider) ──
+  function volPct(e) {{
+    const rect = volTrack.getBoundingClientRect();
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    // bottom = max volume, top = min
+    return Math.max(0, Math.min(1, 1 - (y - rect.top) / rect.height));
+  }}
+  function doVol(e) {{
+    vol = volPct(e);
+    audio.volume = vol;
+    setVolUI(vol);
+  }}
+  volTrack.addEventListener('mousedown',  e => {{ draggingVol=true; doVol(e); e.preventDefault(); }});
+  volTrack.addEventListener('touchstart', e => {{ draggingVol=true; doVol(e); }}, {{passive:true}});
+  window.addEventListener('mousemove',  e => {{ if(draggingVol) doVol(e); }});
+  window.addEventListener('touchmove',  e => {{ if(draggingVol) doVol(e); }}, {{passive:true}});
+  window.addEventListener('mouseup',    () => draggingVol=false);
 
   // ── stretch iframe ──
   try {{
