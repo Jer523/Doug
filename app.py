@@ -153,6 +153,11 @@ components.html(f"""
   }}
 
 </style>
+html, body {{
+    height: 100vh;
+    overflow: hidden;
+}}
+
 </head>
 <body>
 
@@ -174,4 +179,4 @@ components.html(f"""
 
 </body>
 </html>
-""", height=700, scrolling=False)
+""", height=800, scrolling=False)
