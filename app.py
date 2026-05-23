@@ -25,7 +25,7 @@ html, body,
 
 AUDIO_URL = "https://raw.githubusercontent.com/Jer523/Douglas/main/assets/brahms_op118_no2.mp3.mp3"
 
-components.html(f"""
+HTML = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -33,27 +33,24 @@ components.html(f"""
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&display=swap" rel="stylesheet">
 <style>
-  * {{
+  * {
     margin:0; padding:0; box-sizing:border-box;
     -webkit-user-select:none;
     user-select:none;
-  }}
-
-  html, body {{
+  }
+  html, body {
     width:100%; height:100%;
     background:#FDFBF7;
     font-family:'Playfair Display', Georgia, serif;
     color:#4A4A4A;
     -webkit-font-smoothing:antialiased;
     overflow:hidden;
-  }}
-
-  @keyframes fadeUp {{
-    from {{ opacity:0; transform:translateY(14px); }}
-    to   {{ opacity:1; transform:translateY(0); }}
-  }}
-
-  .page {{
+  }
+  @keyframes fadeUp {
+    from { opacity:0; transform:translateY(14px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+  .page {
     display:flex;
     flex-direction:column;
     align-items:center;
@@ -61,9 +58,8 @@ components.html(f"""
     padding:26vh 2rem 0 2rem;
     max-width:560px;
     margin:0 auto;
-  }}
-
-  .title {{
+  }
+  .title {
     font-size:50px;
     font-weight:500;
     letter-spacing:0.05em;
@@ -71,9 +67,8 @@ components.html(f"""
     line-height:1.1;
     margin-bottom:1rem;
     animation:fadeUp 1.6s ease-out 0.5s both;
-  }}
-
-  .subtitle {{
+  }
+  .subtitle {
     font-size:15.6px;
     font-style:italic;
     color:#6A6A6A;
@@ -81,56 +76,50 @@ components.html(f"""
     line-height:1.6;
     margin-bottom:3rem;
     animation:fadeUp 1.6s ease-out 1.5s both;
-  }}
-
-  .player-block {{
+  }
+  .player-block {
     width:100%;
     max-width:420px;
     animation:fadeUp 1.4s ease-out 2.5s both;
-  }}
-
-  .divider {{
+  }
+  .divider {
     width:260px;
     height:1px;
     background:#C8BFB0;
     margin:0 auto 2rem auto;
-  }}
-
-  .track {{
+  }
+  .track {
     font-size:12px;
     color:#9B9083;
     letter-spacing:0.08em;
     margin-bottom:1.2rem;
     line-height:1.6;
-  }}
+  }
 
-  /* ── Visualizer ── */
-  .viz-wrap {{
-    width:100%;
-    max-width:270px;
-    /* align with the progress bar: skip the button width + gap */
-    padding-left: calc(5px + 36px + 14px); /* player padding-left + btn width + gap */
-    margin:0 auto 10px auto;
-    box-sizing:border-box;
-  }}
-  #viz-canvas {{
-    display:block;
-    width:100%;
-    height:32px;
-  }}
-
-  /* ── Player row ── */
-  .player-wrap {{
+  /* Player row: button on left, right-col stacks viz + progress */
+  .player-wrap {
     width:100%;
     max-width:270px;
     margin:0 auto;
     display:flex;
     align-items:center;
-    gap:14px;          /* ← increased from 14px */
-    padding-left:5px; /* ← shift button right */
-  }}
+    gap:24px;
+    padding-left:10px;
+  }
+  /* Right column: viz canvas on top, progress bar below — both same width */
+  .right-col {
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  #viz-canvas {
+    display:block;
+    width:100%;
+    height:28px;
+  }
 
-  #play-btn {{
+  #play-btn {
     flex-shrink:0;
     width:36px; height:36px;
     border-radius:50%;
@@ -142,48 +131,43 @@ components.html(f"""
     justify-content:center;
     padding:0;
     -webkit-tap-highlight-color:transparent;
-  }}
-  #play-btn svg {{ width:13px; height:13px; fill:#7A6E65; }}
+  }
+  #play-btn svg { width:13px; height:13px; fill:#7A6E65; }
 
-  .progress-wrap {{
-    flex:1;
+  .progress-wrap {
+    width:100%;
     position:relative;
     height:44px;
     display:flex;
     align-items:center;
     cursor:pointer;
     touch-action:none;
-  }}
-
-  .progress-track {{
+  }
+  .progress-track {
     width:100%;
     height:1px;
     background:#DDD6CE;
     position:relative;
     border-radius:1px;
     pointer-events:none;
-  }}
-
-  #progress-fill {{
+  }
+  #progress-fill {
     height:100%;
     width:0%;
     background:#9B8B75;
     border-radius:1px;
-  }}
-
-  #scrubber {{
+  }
+  #scrubber {
     position:absolute;
     top:50%; left:0%;
     transform:translate(-50%,-50%);
     width:9px; height:9px;
     border-radius:50%;
     background:#9B8B75;
-  }}
-
-  #time-tooltip {{
+  }
+  #time-tooltip {
     position:absolute;
-    top:2px;
-    left:0%;
+    top:2px; left:0%;
     transform:translateX(-50%);
     font-size:9px;
     color:#9B9083;
@@ -191,13 +175,8 @@ components.html(f"""
     opacity:0;
     transition:opacity 0.2s;
     pointer-events:none;
-  }}
-
-  .vol-wrap {{
-    display:none; /* keep vol hidden as before */
-  }}
-
-  .footnote {{
+  }
+  .footnote {
     position:fixed;
     bottom:1.6rem;
     left:0; right:0;
@@ -207,7 +186,7 @@ components.html(f"""
     letter-spacing:2em;
     text-transform:uppercase;
     animation:fadeUp 1.2s ease-out 3.5s both;
-  }}
+  }
 </style>
 </head>
 <body>
@@ -219,14 +198,9 @@ components.html(f"""
     <div class="divider"></div>
     <p class="track">Brahms: Intermezzo Op. 118, No. 2 (1893)</p>
 
-    <audio id="audio-el" preload="none">
-      <source src="{AUDIO_URL}" type="audio/mpeg">
+    <audio id="audio-el" preload="none" crossorigin="anonymous">
+      <source src="__AUDIO_URL__" type="audio/mpeg">
     </audio>
-
-    <!-- Visualizer sits above the player row, aligned with the progress bar -->
-    <div class="viz-wrap">
-      <canvas id="viz-canvas"></canvas>
-    </div>
 
     <div class="player-wrap">
       <button id="play-btn">
@@ -237,14 +211,19 @@ components.html(f"""
         </svg>
       </button>
 
-      <div class="progress-wrap" id="progress-wrap">
-        <div id="time-tooltip"></div>
-        <div class="progress-track">
-          <div id="progress-fill"></div>
-          <div id="scrubber"></div>
+      <!-- right-col: viz + progress share exact same width -->
+      <div class="right-col">
+        <canvas id="viz-canvas"></canvas>
+        <div class="progress-wrap" id="progress-wrap">
+          <div id="time-tooltip"></div>
+          <div class="progress-track">
+            <div id="progress-fill"></div>
+            <div id="scrubber"></div>
+          </div>
         </div>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -262,12 +241,33 @@ components.html(f"""
   let tooltipTimer     = null;
   let draggingProgress = false;
 
+  // ── Web Audio API setup ──
+  let audioCtx  = null;
+  let analyser  = null;
+  let dataArray = null;
+
+  function initWebAudio() {
+    if (audioCtx) return;
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 64;          // 32 frequency bins
+      analyser.smoothingTimeConstant = 0.75;
+      const source = audioCtx.createMediaElementSource(audio);
+      source.connect(analyser);
+      analyser.connect(audioCtx.destination);
+      dataArray = new Uint8Array(analyser.frequencyBinCount);
+    } catch(e) {
+      console.warn('Web Audio API unavailable:', e);
+    }
+  }
+
   // ── helpers ──
-  function fmt(s) {{
+  function fmt(s) {
     if (!isFinite(s) || isNaN(s) || s < 0) return '';
     return Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0');
-  }}
-  function showTooltip(pct, t) {{
+  }
+  function showTooltip(pct, t) {
     const label = fmt(t);
     if (!label) return;
     tooltip.textContent = label;
@@ -275,139 +275,131 @@ components.html(f"""
     tooltip.style.opacity = '1';
     clearTimeout(tooltipTimer);
     tooltipTimer = setTimeout(() => tooltip.style.opacity='0', 1500);
-  }}
-  function updateProgress(pct) {{
+  }
+  function updateProgress(pct) {
     fill.style.width    = (pct*100) + '%';
     scrubber.style.left = (pct*100) + '%';
-  }}
+  }
 
   // ── play/pause ──
-  document.getElementById('play-btn').addEventListener('click', () => {{
-    audio.paused ? audio.play().catch(()=>{{}}) : audio.pause();
-  }});
-  audio.addEventListener('play',  () => {{ iconPlay.style.display='none';  iconPause.style.display='block'; }});
-  audio.addEventListener('pause', () => {{ iconPlay.style.display='block'; iconPause.style.display='none';  }});
-  audio.addEventListener('ended', () => {{ iconPlay.style.display='block'; iconPause.style.display='none'; updateProgress(0); }});
-  audio.addEventListener('timeupdate', () => {{
+  document.getElementById('play-btn').addEventListener('click', () => {
+    initWebAudio();
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    audio.paused ? audio.play().catch(()=>{}) : audio.pause();
+  });
+  audio.addEventListener('play',  () => { iconPlay.style.display='none';  iconPause.style.display='block'; });
+  audio.addEventListener('pause', () => { iconPlay.style.display='block'; iconPause.style.display='none';  });
+  audio.addEventListener('ended', () => { iconPlay.style.display='block'; iconPause.style.display='none'; updateProgress(0); });
+  audio.addEventListener('timeupdate', () => {
     if (audio.duration) updateProgress(audio.currentTime / audio.duration);
-  }});
+  });
 
   // ── progress seek ──
-  function progressPct(e) {{
+  function progressPct(e) {
     const rect = progressWrap.getBoundingClientRect();
     const x = e.touches ? e.touches[0].clientX : e.clientX;
     return Math.max(0, Math.min(1, (x - rect.left) / rect.width));
-  }}
-  function doSeek(e) {{
+  }
+  function doSeek(e) {
     const pct = progressPct(e);
     updateProgress(pct);
-    if (audio.duration) {{
+    if (audio.duration) {
       audio.currentTime = pct * audio.duration;
       showTooltip(pct, audio.currentTime);
-    }}
-  }}
-  progressWrap.addEventListener('mousedown',  e => {{ draggingProgress=true; doSeek(e); e.preventDefault(); }});
-  progressWrap.addEventListener('touchstart', e => {{ draggingProgress=true; doSeek(e); }}, {{passive:true}});
-  window.addEventListener('mousemove',  e => {{ if(draggingProgress) doSeek(e); }});
-  window.addEventListener('touchmove',  e => {{ if(draggingProgress) doSeek(e); }}, {{passive:true}});
+    }
+  }
+  progressWrap.addEventListener('mousedown',  e => { draggingProgress=true; doSeek(e); e.preventDefault(); });
+  progressWrap.addEventListener('touchstart', e => { draggingProgress=true; doSeek(e); }, {passive:true});
+  window.addEventListener('mousemove',  e => { if(draggingProgress) doSeek(e); });
+  window.addEventListener('touchmove',  e => { if(draggingProgress) doSeek(e); }, {passive:true});
   window.addEventListener('mouseup',    () => draggingProgress=false);
-  window.addEventListener('touchend',   () => {{ draggingProgress=false; }});
+  window.addEventListener('touchend',   () => { draggingProgress=false; });
 
-  // ──────────────────────────────────────────
-  //  Music Visualizer
-  // ──────────────────────────────────────────
+  // ── Visualizer ──
   const canvas = document.getElementById('viz-canvas');
   const ctx    = canvas.getContext('2d');
 
-  const BAR_COUNT  = 28;
-  const BAR_W      = 4;   // px (logical)
-  const BAR_GAP    = 3;   // px between bars
-  const MAX_H      = 26;  // maximum bar height px
-  const MIN_H      = 2;   // resting height px
-  const COLOR_BAR  = '#B8A898';
-  const COLOR_BG   = 'transparent';
+  const BAR_COUNT = 28;
+  const BAR_W     = 4;
+  const BAR_GAP   = 3;
+  const MAX_H     = 24;
+  const MIN_H     = 2;
 
-  // Each bar has a current height and a target height
-  const bars = Array.from({{length: BAR_COUNT}}, () => ({{
+  const bars = Array.from({length: BAR_COUNT}, () => ({
     h: MIN_H,
     target: MIN_H,
-    speed: 0.08 + Math.random() * 0.1,
-  }}));
+    speed: 0.15 + Math.random() * 0.1
+  }));
 
-  let targetUpdateCounter = 0;
+  if (!CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function(x,y,w,h,r) {
+      this.rect(x,y,w,h);
+    };
+  }
 
-  function resizeCanvas() {{
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.parentElement.getBoundingClientRect();
-    canvas.width  = rect.width  * dpr;
-    canvas.height = 32          * dpr;
+  function resizeCanvas() {
+    const dpr  = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width  = rect.width * dpr;
+    canvas.height = 28         * dpr;
     ctx.scale(dpr, dpr);
-  }}
+  }
   resizeCanvas();
   window.addEventListener('resize', resizeCanvas);
 
-  function drawViz() {{
-    const W = canvas.width  / (window.devicePixelRatio || 1);
-    const H = canvas.height / (window.devicePixelRatio || 1);
+  function drawViz() {
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.width  / dpr;
+    const H = canvas.height / dpr;
     ctx.clearRect(0, 0, W, H);
 
     const playing = !audio.paused && !audio.ended;
 
-    // Every ~8 frames, randomise targets for playing bars
-    targetUpdateCounter++;
-    if (targetUpdateCounter >= 8) {{
-      targetUpdateCounter = 0;
-      bars.forEach(b => {{
-        if (playing) {{
-          // Weighted random: more mid-range heights feel musical
-          const r = Math.random();
-          b.target = MIN_H + r * r * (MAX_H - MIN_H);
-        }} else {{
-          b.target = MIN_H;
-        }}
-      }});
-    }}
+    // Update bar targets from real frequency data when playing
+    if (playing && analyser && dataArray) {
+      analyser.getByteFrequencyData(dataArray);
+      const binCount = dataArray.length; // 32 bins
+      for (let i = 0; i < BAR_COUNT; i++) {
+        // Map each bar to a frequency bin (spread across bass–mid range)
+        const binIndex = Math.floor(i * (binCount * 0.75) / BAR_COUNT);
+        const norm = dataArray[binIndex] / 255;  // 0..1
+        bars[i].target = MIN_H + norm * norm * (MAX_H - MIN_H);
+      }
+    } else {
+      for (let i = 0; i < BAR_COUNT; i++) {
+        bars[i].target = MIN_H;
+      }
+    }
 
-    // Smooth interpolation
-    bars.forEach(b => {{
-      b.h += (b.target - b.h) * b.speed;
-      if (b.h < MIN_H) b.h = MIN_H;
-    }});
-
-    // Total width of all bars
+    // Smooth interpolation toward target
     const totalW = BAR_COUNT * BAR_W + (BAR_COUNT - 1) * BAR_GAP;
     let x = (W - totalW) / 2;
 
-    bars.forEach(b => {{
-      const barH = Math.max(MIN_H, b.h);
-      // Draw bar centred vertically
+    for (let i = 0; i < BAR_COUNT; i++) {
+      bars[i].h += (bars[i].target - bars[i].h) * bars[i].speed;
+      if (bars[i].h < MIN_H) bars[i].h = MIN_H;
+      const barH = bars[i].h;
       const y = (H - barH) / 2;
-      ctx.fillStyle = COLOR_BAR;
+      ctx.fillStyle = '#B8A898';
       ctx.beginPath();
       ctx.roundRect(x, y, BAR_W, barH, 1);
       ctx.fill();
       x += BAR_W + BAR_GAP;
-    }});
+    }
 
     requestAnimationFrame(drawViz);
-  }}
-
-  // roundRect polyfill for older Safari
-  if (!CanvasRenderingContext2D.prototype.roundRect) {{
-    CanvasRenderingContext2D.prototype.roundRect = function(x,y,w,h,r) {{
-      this.rect(x,y,w,h); // fallback: plain rect
-    }};
-  }}
+  }
 
   drawViz();
 
-  // ── stretch iframe ──
-  try {{
-    window.parent.document.querySelectorAll('iframe').forEach(f => {{
+  try {
+    window.parent.document.querySelectorAll('iframe').forEach(f => {
       f.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:'+window.screen.height+'px;border:none;z-index:99999;';
-    }});
-  }} catch(e) {{}}
+    });
+  } catch(e) {}
 </script>
 </body>
 </html>
-""", height=900, scrolling=False)
+"""
+
+components.html(HTML.replace("__AUDIO_URL__", AUDIO_URL), height=900, scrolling=False)
