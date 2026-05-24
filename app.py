@@ -96,13 +96,11 @@ HTML = """
     line-height:1.6;
   }
 
-  .viz-wrap {
+  /* ── 1. Visualizer 独立容器，完全居中 ── */
+  .viz-container {
     width:100%;
     max-width:270px;
-    padding-left: calc(5px + 36px + 14px);
-    margin:0 auto 8px auto;
-    box-sizing:border-box;
-    overflow:hidden;
+    margin:0 auto 10px auto;
   }
   #viz-canvas {
     display:block;
@@ -110,15 +108,16 @@ HTML = """
     height:28px;
   }
 
-  .player-wrap {
+  /* ── 2. 播放控件独立容器，完全居中 ── */
+  .player-container {
     width:100%;
     max-width:270px;
     margin:0 auto;
     display:flex;
     align-items:center;
     gap:14px;
-    padding-left:5px;
   }
+
   #play-btn {
     flex-shrink:0;
     width:36px; height:36px;
@@ -202,11 +201,13 @@ HTML = """
       <source src="__AUDIO_URL__" type="audio/mpeg">
     </audio>
 
-    <div class="viz-wrap">
+    <!-- 上行：Visualizer 独立居中 -->
+    <div class="viz-container">
       <canvas id="viz-canvas"></canvas>
     </div>
 
-    <div class="player-wrap">
+    <!-- 下行：播放控件独立居中 -->
+    <div class="player-container">
       <button id="play-btn">
         <svg id="icon-play" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
         <svg id="icon-pause" viewBox="0 0 24 24" style="display:none">
@@ -222,6 +223,7 @@ HTML = """
         </div>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -250,7 +252,6 @@ HTML = """
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       analyser = audioCtx.createAnalyser();
       analyser.fftSize = 2048;
-      // 4. 延音平滑：模拟钢琴余音
       analyser.smoothingTimeConstant = 0.85;
       const source = audioCtx.createMediaElementSource(audio);
       source.connect(analyser);
@@ -320,30 +321,38 @@ HTML = """
   const MAX_H     = 24;
   const MIN_H     = 2;
 
-  // 2. 频率上限：截断在 9000Hz，去除钢琴无效死区
-  const FREQ_MIN = 40;    // Hz — 钢琴最低音 A0 ≈ 27.5Hz
-  const FREQ_MAX = 9000;  // Hz — 截断极高频
+  const FREQ_MIN = 40;
+  const FREQ_MAX = 9000;
 
-  // 预计算每根 bar 对应的 FFT bin（对数映射，在 initWebAudio 后计算）
+  // barBins[i] = which FFT bin index bar i reads from
+  // Built once after audioCtx is ready (we need sampleRate)
   let barBins = null;
 
   function buildBarBins() {
-    // fftSize=2048 → 1024 bins, each bin = sampleRate/fftSize Hz
-    const sampleRate = audioCtx.sampleRate;
-    const totalBins  = analyser.frequencyBinCount; // 1024
-    const hzPerBin   = sampleRate / (analyser.fftSize);
+    const sampleRate = audioCtx.sampleRate;          // typically 44100 or 48000
+    const totalBins  = analyser.frequencyBinCount;   // 1024
+    const hzPerBin   = sampleRate / analyser.fftSize; // e.g. 44100/2048 ≈ 21.5 Hz
 
-    // 1. 对数频率映射：log scale from FREQ_MIN to FREQ_MAX
+    // 1. Find the bin index that corresponds to FREQ_MAX
+    //    This is the cutoff — we only use bins 0..maxBin
+    const maxBin = Math.min(
+      Math.round(FREQ_MAX / hzPerBin),
+      totalBins - 1
+    );
+
+    // 2. Log-scale mapping from FREQ_MIN..FREQ_MAX → bars 0..BAR_COUNT-1
+    //    Then remap those bins to 0..maxBin (i.e., fill the full width)
     const logMin = Math.log10(FREQ_MIN);
     const logMax = Math.log10(FREQ_MAX);
 
     barBins = [];
     for (let i = 0; i < BAR_COUNT; i++) {
-      // t goes 0 (left/low) → 1 (right/high)
-      const t   = i / (BAR_COUNT - 1);
-      const hz  = Math.pow(10, logMin + t * (logMax - logMin));
+      const t   = i / (BAR_COUNT - 1);                          // 0=left/low, 1=right/high
+      const hz  = Math.pow(10, logMin + t * (logMax - logMin)); // log-spaced Hz
+      // Map hz directly to bin — this already remaps to 0..maxBin
+      // because hz stays within FREQ_MIN..FREQ_MAX
       const bin = Math.round(hz / hzPerBin);
-      barBins.push(Math.min(bin, totalBins - 1));
+      barBins.push(Math.min(bin, maxBin));
     }
   }
 
@@ -377,31 +386,26 @@ HTML = """
     const H   = canvas.height / dpr;
     ctx.clearRect(0, 0, W, H);
 
-    const BAR_W  = (W - (BAR_COUNT - 1) * BAR_GAP) / BAR_COUNT;
+    const BAR_W   = (W - (BAR_COUNT - 1) * BAR_GAP) / BAR_COUNT;
     const playing = !audio.paused && !audio.ended;
 
     if (playing) {
       if (analyser && dataArray) {
-        // Build barBins once after Web Audio is ready
         if (!barBins) buildBarBins();
-
         analyser.getByteFrequencyData(dataArray);
 
         for (let i = 0; i < BAR_COUNT; i++) {
           const bin = barBins[i];
-          const raw = dataArray[bin] / 255; // 0..1
+          const raw = dataArray[bin] / 255;
 
-          // 3. EQ 补偿：高频 bar 获得渐进增益
-          // t=0 → 低频无增益，t=1 → 高频最大增益
-          const t       = i / (BAR_COUNT - 1);
-          // 低频段（t<0.4）轻微压制，中高频逐渐提升
-          const eqGain  = 0.85 + t * 1.3;
+          // 3. EQ gain: smoothly ramp from 0.85 (low) to 2.15 (high)
+          const t      = i / (BAR_COUNT - 1);
+          const eqGain = 0.85 + t * 1.3;
           const boosted = Math.min(1, raw * eqGain);
 
           bars[i].target = MIN_H + boosted * (MAX_H - MIN_H);
         }
       } else {
-        // Fallback random until Web Audio initialises
         tickCount++;
         if (tickCount >= 5) {
           tickCount = 0;
