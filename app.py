@@ -600,7 +600,7 @@ HTML = """
   // ========== 可视化 ==========
   const canvas = document.getElementById('viz-canvas');
   const ctx    = canvas.getContext('2d');
-  const BAR_COUNT = 36;
+  const BAR_COUNT = 40;
   const BAR_GAP   = 2;
   const MAX_H     = 24;
   const MIN_H     = 2;
