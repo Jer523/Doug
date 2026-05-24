@@ -197,7 +197,8 @@ HTML = """
     color:#C0B8B0;
     letter-spacing:2em;
     text-transform:uppercase;
-    animation:fadeUp 1.2s ease-out 3.5s both;
+    opacity: 0;   /* 初始透明，交由动画控制 */
+    animation: fadeUp 1.2s ease-out 1.5s forwards;  /* 1.5秒后开始淡入，动画结束后保持可见 */
   }
 </style>
 </head>
