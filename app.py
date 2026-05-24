@@ -35,7 +35,7 @@ html, body,
     pointer-events: none;
     white-space: nowrap;
     opacity: 0;                    /* 初始透明 */
-    animation: footnoteFadeIn 1.2s ease-out 3.5s forwards;  /* 1.5秒后淡入 */
+    animation: footnoteFadeIn 1.2s ease-out 3.0s forwards;
 }
 
 @keyframes footnoteFadeIn {
