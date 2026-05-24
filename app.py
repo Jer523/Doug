@@ -189,6 +189,7 @@ HTML = """
   }
   .footnote {
     position:fixed;
+    z-index:10000;
     bottom:1.6rem;
     left:0; right:0;
     text-align:center;
@@ -356,7 +357,7 @@ HTML = """
   function showTooltip(pct, t) {
     const label = fmt(t);
     if (!label) return;
-    tooltip.textContent = label;
+    tooltip.textContent = label + (duration ? ' / ' + fmt(duration) : '');
     tooltip.style.left = Math.max(5, Math.min(95, pct*100)) + '%';
     tooltip.style.opacity = '1';
     clearTimeout(tooltipTimer);
@@ -663,11 +664,11 @@ HTML = """
         const raw = dataArray[barBins[i]] / 255;
         const t = i / (BAR_COUNT - 1);
         let eqGain;
-        if (t < 0.07) { eqGain = 0.1; }
+        if (t < 0.07) { eqGain = 0.25; }
         else if (t < 0.65) { eqGain = 0.1 + Math.pow((t - 0.07) / 0.58, 0.8) * 1.4; }
         else { eqGain = 1.0 + Math.pow((t - 0.65) / 0.35, 1.0) * 5.0; }
         const boosted = Math.min(1, raw * eqGain);
-        const barMax = t < 0.65 ? MAX_H : MAX_H - Math.pow((t - 0.65) / 0.35, 0.7) * 16;
+        const barMax = t < 0.65 ? MAX_H : MAX_H - Math.pow((t - 0.65) / 0.35, 0.7) * 10;
         bars[i].target = MIN_H + boosted * (barMax - MIN_H);
       }
     } else {
