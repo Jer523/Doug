@@ -268,48 +268,29 @@ HTML = """
     }
   }
 
-  // 淡出20ms → 执行操作 → 淡入20ms，消除咔哒声
-    const FADE_S = 0.06;
-  const FADE_MS = FADE_S * 1000 + 20;
-
-  function fadeAndDo(action) {
-    if (!gainNode) { action(); return; }
-    const g   = gainNode.gain;
-    const now = audioCtx.currentTime;
-    g.cancelScheduledValues(now);
-    g.setValueAtTime(g.value, now);
-    g.linearRampToValueAtTime(0, now + FADE_S);
-    setTimeout(() => {
-      action();
-      const t = audioCtx.currentTime;
-      g.setValueAtTime(0, t);
-      g.linearRampToValueAtTime(1.0, t + FADE_S);
-    }, FADE_MS);
+  // 安全淡出：将增益在极短时间内拉到 0，并返回一个在增益稳定为 0 后 resolve 的 Promise
+  function fadeOutQuick() {
+    return new Promise((resolve) => {
+      if (!gainNode) return resolve();
+      const g = gainNode.gain;
+      const now = audioCtx.currentTime;
+      g.cancelScheduledValues(now);
+      g.setValueAtTime(g.value, now);
+      g.linearRampToValueAtTime(0, now + 0.01); // 10ms 快速淡出
+      // 确保增益为 0 后继续执行
+      setTimeout(resolve, 20);
+    });
   }
 
-  function fadeSeekFadeIn(targetTime) {
-    if (!gainNode) { audio.currentTime = targetTime; return; }
-    const g   = gainNode.gain;
+  // 安全淡入：从 0 拉回 1
+  function fadeInQuick() {
+    if (!gainNode) return;
+    const g = gainNode.gain;
     const now = audioCtx.currentTime;
     g.cancelScheduledValues(now);
-    g.setValueAtTime(g.value, now);
-    g.linearRampToValueAtTime(0, now + FADE_S);
-    setTimeout(() => {
-      const onSeeked = () => {
-        clearTimeout(fallback);
-        setTimeout(() => {
-          const t = audioCtx.currentTime;
-          g.cancelScheduledValues(t);
-          g.setValueAtTime(0, t);
-          g.linearRampToValueAtTime(1.0, t + FADE_S);
-        }, 30);
-      };
-      const fallback = setTimeout(onSeeked, 400);
-      audio.addEventListener('seeked', onSeeked, { once: true });
-      audio.currentTime = targetTime;
-    }, FADE_MS);
+    g.setValueAtTime(0, now);
+    g.linearRampToValueAtTime(1.0, now + 0.02); // 20ms 淡入
   }
-
 
   function fmt(s) {
     if (!isFinite(s) || isNaN(s) || s < 0) return '';
@@ -378,14 +359,37 @@ HTML = """
     e.preventDefault();
   }
 
-  function dragEnd() {
+  async function dragEnd() {
     if (!draggingProgress) return;
     draggingProgress = false;
     fill.style.transition    = 'width 0.15s ease-out';
     scrubber.style.transition = 'left 0.15s ease-out';
+
     if (lastDragPct !== null && audio.duration) {
       const targetTime = lastDragPct * audio.duration;
-            fadeSeekFadeIn(targetTime);
+
+      // 1. 先快速淡出并暂停（消除播放态下的 seek 杂音）
+      await fadeOutQuick();
+      const wasPlaying = !audio.paused;
+      audio.pause();
+
+      // 2. 等待暂停稳定后设置时间
+      audio.currentTime = targetTime;
+
+      // 3. 等待 seek 完成，若之前是播放状态则恢复播放并淡入
+      if (wasPlaying) {
+        const onSeeked = () => {
+          audio.removeEventListener('seeked', onSeeked);
+          audio.play().catch(()=>{});
+          fadeInQuick();
+        };
+        audio.addEventListener('seeked', onSeeked, { once: true });
+      } else {
+        // 若本来暂停，只需同步一次进度显示
+        fadeInQuick(); // 增益拉回正常（虽然不播放但保持增益为 1 供下次播放）
+        // 手动更新一次进度，以免视觉残留
+        updateProgress(targetTime / audio.duration);
+      }
     }
   }
 
@@ -396,27 +400,39 @@ HTML = """
   window.addEventListener('mouseup',    dragEnd);
   window.addEventListener('touchend',   dragEnd);
 
-  document.getElementById('play-btn').addEventListener('click', () => {
+  // 播放/暂停按钮：同样采用淡出/淡入保障静音切换
+  document.getElementById('play-btn').addEventListener('click', async () => {
     initWebAudio();
-    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-    fadeAndDo(() => {
-      audio.paused ? audio.play().catch(()=>{}) : audio.pause();
-    });
+    if (audioCtx && audioCtx.state === 'suspended') await audioCtx.resume();
+
+    if (audio.paused) {
+      // 将要播放：增益先拉到 0，播放后再淡入
+      if (gainNode) {
+        gainNode.gain.cancelScheduledValues(audioCtx.currentTime);
+        gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+      }
+      await audio.play().catch(()=>{});
+      fadeInQuick();
+    } else {
+      // 暂停：先快速淡出，再暂停
+      await fadeOutQuick();
+      audio.pause();
+      // 增益拉回 1 以备下次播放
+      fadeInQuick();
+    }
   });
 
   audio.addEventListener('play',  () => { iconPlay.style.display='none';  iconPause.style.display='block'; });
   audio.addEventListener('pause', () => { iconPlay.style.display='block'; iconPause.style.display='none';  });
   audio.addEventListener('ended', () => { iconPlay.style.display='block'; iconPause.style.display='none'; updateProgress(0); });
 
-  // ── Visualizer ──
+  // ── 可视化部分（不变） ──
   const canvas = document.getElementById('viz-canvas');
   const ctx    = canvas.getContext('2d');
-
   const BAR_COUNT = 44;
   const BAR_GAP   = 2;
   const MAX_H     = 24;
   const MIN_H     = 2;
-
   let barBins = null;
 
   function buildBarBins() {
@@ -456,16 +472,13 @@ HTML = """
   window.addEventListener('resize', resizeCanvas);
 
   let tickCount = 0;
-
   function drawViz() {
     const dpr = window.devicePixelRatio || 1;
     const W   = canvas.width  / dpr;
     const H   = canvas.height / dpr;
     ctx.clearRect(0, 0, W, H);
-
     const BAR_W   = (W - (BAR_COUNT - 1) * BAR_GAP) / BAR_COUNT;
     const playing = !audio.paused && !audio.ended;
-
     if (playing) {
       if (analyser && dataArray) {
         if (!barBins) buildBarBins();
@@ -474,15 +487,11 @@ HTML = """
           const raw = dataArray[barBins[i]] / 255;
           const t = i / (BAR_COUNT - 1);
           let eqGain;
-          if (t < 0.07) {
-            eqGain = 0.1;
-          } else if (t < 0.65) {
-            eqGain = 0.1 + Math.pow((t - 0.07) / 0.58, 0.8) * 1.4;
-          } else {
-            eqGain = 1.0 + Math.pow((t - 0.65) / 0.35, 1.0) * 5.0;
-          }
+          if (t < 0.07) { eqGain = 0.1; }
+          else if (t < 0.65) { eqGain = 0.1 + Math.pow((t - 0.07) / 0.58, 0.8) * 1.4; }
+          else { eqGain = 1.0 + Math.pow((t - 0.65) / 0.35, 1.0) * 5.0; }
           const boosted = Math.min(1, raw * eqGain);
-          const barMax  = t < 0.65 ? MAX_H : MAX_H - Math.pow((t - 0.65) / 0.35, 0.7) * 16;
+          const barMax = t < 0.65 ? MAX_H : MAX_H - Math.pow((t - 0.65) / 0.35, 0.7) * 16;
           bars[i].target = MIN_H + boosted * (barMax - MIN_H);
         }
       } else {
@@ -497,23 +506,20 @@ HTML = """
     } else {
       for (let i = 0; i < BAR_COUNT; i++) bars[i].target = MIN_H;
     }
-
     let x = 0;
     for (let i = 0; i < BAR_COUNT; i++) {
       bars[i].h += (bars[i].target - bars[i].h) * bars[i].speed;
       if (bars[i].h < MIN_H) bars[i].h = MIN_H;
       const barH = bars[i].h;
-      const y    = (H - barH) / 2;
+      const y = (H - barH) / 2;
       ctx.fillStyle = '#B8A898';
       ctx.beginPath();
       ctx.roundRect(x, y, BAR_W, barH, 1);
       ctx.fill();
       x += BAR_W + BAR_GAP;
     }
-
     requestAnimationFrame(drawViz);
   }
-
   drawViz();
 
   try {
