@@ -27,7 +27,7 @@ html, body,
     bottom: 1.6rem;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 9px;                /* 可改大，例如 11px */
+    font-size: 2px;                /* 可改大，例如 11px */
     color: #C0B8B0;
     letter-spacing: 2em;           /* 可改 2.5em 等 */
     text-transform: uppercase;
@@ -35,7 +35,7 @@ html, body,
     pointer-events: none;
     white-space: nowrap;
     opacity: 0;                    /* 初始透明 */
-    animation: footnoteFadeIn 1.2s ease-out 1.5s forwards;  /* 1.5秒后淡入 */
+    animation: footnoteFadeIn 1.2s ease-out 2s forwards;  /* 1.5秒后淡入 */
 }
 
 @keyframes footnoteFadeIn {
