@@ -238,7 +238,6 @@ HTML = """
   let draggingProgress = false;
   let isSeeking        = false;
 
-  // ── Web Audio ──
   let audioCtx  = null;
   let analyser  = null;
   let dataArray = null;
@@ -325,33 +324,27 @@ HTML = """
   const ctx    = canvas.getContext('2d');
 
   const BAR_COUNT = 44;
-  const HALF      = BAR_COUNT / 2;
   const BAR_GAP   = 2;
   const MAX_H     = 24;
   const MIN_H     = 2;
 
   let barBins = null;
 
-  // ── THE FIX: buildBarBins now actually builds barBins ──
+  // ── CHANGE 1 & 2: 单向左→右，log映射 60Hz~5000Hz 铺满全部44根柱子 ──
   function buildBarBins() {
     const sampleRate = audioCtx.sampleRate;
     const totalBins  = analyser.frequencyBinCount;
     const hzPerBin   = sampleRate / analyser.fftSize;
 
-    // Map HALF bars on a log scale from 60Hz to 5000Hz
-    // i=0 is innermost (centre) = lowest freq
-    // i=HALF-1 is outermost (edge) = highest freq
     const freqMin = 60;
     const freqMax = 5000;
 
     barBins = new Array(BAR_COUNT);
-    for (let i = 0; i < HALF; i++) {
-      const t      = i / (HALF - 1);
-      const freq   = freqMin * Math.pow(freqMax / freqMin, t);
-      const bin    = Math.min(Math.round(freq / hzPerBin), totalBins - 1);
-      // Mirror: innermost = centre pair, outermost = edges
-      barBins[HALF - 1 - i] = bin;   // left half
-      barBins[HALF + i]     = bin;   // right half
+    for (let i = 0; i < BAR_COUNT; i++) {
+      // i=0 → freqMin, i=BAR_COUNT-1 → freqMax, log scale
+      const t    = i / (BAR_COUNT - 1);
+      const freq = freqMin * Math.pow(freqMax / freqMin, t);
+      barBins[i] = Math.min(Math.round(freq / hzPerBin), totalBins - 1);
     }
   }
 
@@ -392,9 +385,27 @@ HTML = """
       if (analyser && dataArray) {
         if (!barBins) buildBarBins();
         analyser.getByteFrequencyData(dataArray);
+
         for (let i = 0; i < BAR_COUNT; i++) {
-          const raw     = dataArray[barBins[i]] / 255;
-          const boosted = Math.min(1, raw * 2.0);
+          const raw = dataArray[barBins[i]] / 255;
+
+          // ── CHANGE 3: 基于柱子位置的EQ动态权重 ──
+          // t=0 → 最左低频, t=1 → 最右高频
+          // 低频: 1.5, 中频: 1.0, 高频: 2.5+ (三段平滑插值)
+          const t = i / (BAR_COUNT - 1);
+          let eqGain;
+          if (t < 0.4) {
+            // 低频段: 1.5 → 1.0
+            eqGain = 1.5 - t / 0.4 * 0.5;
+          } else if (t < 0.65) {
+            // 中频段: 保持 1.0
+            eqGain = 1.0;
+          } else {
+            // 高频段: 1.0 → 2.8，快速拉升
+            eqGain = 1.0 + Math.pow((t - 0.65) / 0.35, 1.5) * 1.8;
+          }
+
+          const boosted  = Math.min(1, raw * eqGain);
           bars[i].target = MIN_H + boosted * (MAX_H - MIN_H);
         }
       } else {
