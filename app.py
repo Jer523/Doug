@@ -395,15 +395,15 @@ HTML = """
           const t = i / (BAR_COUNT - 1);
           let eqGain;
           if (t < 0.4) {
-            // 低频段: 1.5 → 1.0
-            eqGain = 1.5 - t / 0.4 * 0.5;
-          } else if (t < 0.65) {
-            // 中频段: 保持 1.0
-            eqGain = 1.0;
-          } else {
-            // 高频段: 1.0 → 2.8，快速拉升
-            eqGain = 1.0 + Math.pow((t - 0.65) / 0.35, 1.5) * 0.2;
-          }
+                // 低频：固定 0.4，钢琴 raw≈0.8 时 boosted≈0.32，视觉约 1/3 高
+                eqGain = 0.4;
+            } else if (t < 0.65) {
+                // 中低频：0.4 平滑过渡到 0.7，逐渐活跃但不超半格
+                eqGain = 0.4 + ((t - 0.4) / 0.25) * 0.3;
+            } else {
+                // 高频：保持你的设定不变
+                eqGain = 1.0 + Math.pow((t - 0.65) / 0.35, 1.5) * 0.2;
+            }
 
           const boosted  = Math.min(1, raw * eqGain);
           bars[i].target = MIN_H + boosted * (MAX_H - MIN_H);
