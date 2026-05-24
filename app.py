@@ -354,14 +354,17 @@ HTML = """
 
     // 2. Log-scale mapping from FREQ_MIN..FREQ_MAX → bars 0..BAR_COUNT-1
     //    Then remap those bins to 0..maxBin (i.e., fill the full width)
-        barBins = [];
-    for (let i = 0; i < BAR_COUNT; i++) {
-      // 指数映射：低频区占更多格子，高频区压缩
-      const t   = Math.pow(i / (BAR_COUNT - 1), 1.6);
-      const hz  = FREQ_MIN + t * (6000 - FREQ_MIN);
-      const bin = Math.round(hz / hzPerBin);
-      barBins.push(Math.min(bin, maxBin));
-    }
+    function dragEnd() {
+        if (!draggingProgress) return;
+        draggingProgress = false;
+        if (pendingPct !== null && audio.duration) {
+          audio.currentTime = pendingPct * audio.duration;
+          isSeeking = true;
+          setTimeout(() => { isSeeking = false; }, 300);
+          pendingPct = null;
+        }
+      }
+
   }
 
   const bars = Array.from({length: BAR_COUNT}, () => ({
