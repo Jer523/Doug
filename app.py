@@ -154,6 +154,8 @@ HTML = """
     width:0%;
     background:#9B8B75;
     border-radius:1px;
+    /* 释放拖拽后平滑过渡，掩盖关键帧对齐的微小纠正 */
+    transition: width 0.25s ease;
   }
   #scrubber {
     position:absolute;
@@ -162,6 +164,8 @@ HTML = """
     width:9px; height:9px;
     border-radius:50%;
     background:#9B8B75;
+    /* 同上 */
+    transition: left 0.25s ease;
   }
   #time-tooltip {
     position:absolute;
@@ -235,10 +239,70 @@ HTML = """
   const progressWrap = document.getElementById('progress-wrap');
   const tooltip      = document.getElementById('time-tooltip');
 
-  let tooltipTimer     = null;
-  let draggingProgress = false;
-  let isSeeking        = false;
+  let tooltipTimer   = null;
 
+  // ── 进度条状态机 ──
+  let isDragging     = false;   // 用户正在拖拽
+  let isSeeking      = false;   // audio 正在 seek（seeking 事件触发后）
+  let isVisualHold   = false;   // seeked 后的视觉缓冲期
+  let visualHoldPct  = 0;       // 缓冲期内强行显示的百分比
+  let visualHoldTimer = null;
+
+  // 禁用 fill/scrubber 的 CSS transition（拖拽时绝对跟手）
+  function disableTransition() {
+    fill.style.transition    = 'none';
+    scrubber.style.transition = 'none';
+  }
+  // 恢复 CSS transition（释放后平滑掩盖关键帧纠正）
+  function enableTransition() {
+    fill.style.transition    = 'width 0.25s ease';
+    scrubber.style.transition = 'left 0.25s ease';
+  }
+
+  function setProgressUI(pct) {
+    fill.style.width    = (pct * 100) + '%';
+    scrubber.style.left = (pct * 100) + '%';
+  }
+
+  function fmt(s) {
+    if (!isFinite(s) || isNaN(s) || s < 0) return '';
+    return Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0');
+  }
+  function showTooltip(pct, t) {
+    const label = fmt(t);
+    if (!label) return;
+    tooltip.textContent = label;
+    tooltip.style.left = Math.max(5, Math.min(95, pct*100)) + '%';
+    tooltip.style.opacity = '1';
+    clearTimeout(tooltipTimer);
+    tooltipTimer = setTimeout(() => tooltip.style.opacity='0', 1500);
+  }
+
+  // ── timeupdate：只有完全空闲时才跟随播放头 ──
+  audio.addEventListener('timeupdate', () => {
+    if (isDragging || isSeeking || isVisualHold) return;
+    if (audio.duration) setProgressUI(audio.currentTime / audio.duration);
+  });
+
+  // ── seeking / seeked：严格用原生事件接管状态 ──
+  audio.addEventListener('seeking', () => {
+    isSeeking = true;
+  });
+
+  audio.addEventListener('seeked', () => {
+    isSeeking = false;
+    // 视觉缓冲期：seeked 后再屏蔽 timeupdate 300ms
+    // 用于掩盖 MP3 关键帧对齐导致的底层时间微小回跳
+    isVisualHold = true;
+    clearTimeout(visualHoldTimer);
+    visualHoldTimer = setTimeout(() => {
+      isVisualHold = false;
+      // 缓冲期结束后，用实际时间平滑更新（transition 已开启）
+      if (audio.duration) setProgressUI(audio.currentTime / audio.duration);
+    }, 300);
+  });
+
+  // ── play/pause ──
   let audioCtx  = null;
   let analyser  = null;
   let dataArray = null;
@@ -259,24 +323,6 @@ HTML = """
     }
   }
 
-  function fmt(s) {
-    if (!isFinite(s) || isNaN(s) || s < 0) return '';
-    return Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0');
-  }
-  function showTooltip(pct, t) {
-    const label = fmt(t);
-    if (!label) return;
-    tooltip.textContent = label;
-    tooltip.style.left = Math.max(5, Math.min(95, pct*100)) + '%';
-    tooltip.style.opacity = '1';
-    clearTimeout(tooltipTimer);
-    tooltipTimer = setTimeout(() => tooltip.style.opacity='0', 1500);
-  }
-  function updateProgress(pct) {
-    fill.style.width    = (pct*100) + '%';
-    scrubber.style.left = (pct*100) + '%';
-  }
-
   document.getElementById('play-btn').addEventListener('click', () => {
     initWebAudio();
     if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
@@ -284,41 +330,56 @@ HTML = """
   });
   audio.addEventListener('play',  () => { iconPlay.style.display='none';  iconPause.style.display='block'; });
   audio.addEventListener('pause', () => { iconPlay.style.display='block'; iconPause.style.display='none';  });
-  audio.addEventListener('ended', () => { iconPlay.style.display='block'; iconPause.style.display='none'; updateProgress(0); });
-  audio.addEventListener('timeupdate', () => {
-    if (!draggingProgress && !isSeeking && audio.duration)
-      updateProgress(audio.currentTime / audio.duration);
+  audio.addEventListener('ended', () => {
+    iconPlay.style.display='block'; iconPause.style.display='none';
+    enableTransition();
+    setProgressUI(0);
   });
 
-  let pendingPct = null;
-
+  // ── 拖拽逻辑 ──
   function progressPct(e) {
     const rect = progressWrap.getBoundingClientRect();
     const x = e.touches ? e.touches[0].clientX : e.clientX;
     return Math.max(0, Math.min(1, (x - rect.left) / rect.width));
   }
-  function dragMove(e) {
-    if (!draggingProgress) return;
-    pendingPct = progressPct(e);
-    updateProgress(pendingPct);
-    showTooltip(pendingPct, pendingPct * (audio.duration || 0));
+
+  function onDragStart(e) {
+    isDragging = true;
+    isVisualHold = false;          // 拖拽立刻接管，取消缓冲期
+    clearTimeout(visualHoldTimer);
+    disableTransition();           // 绝对跟手，无 transition
+    const pct = progressPct(e);
+    setProgressUI(pct);
+    showTooltip(pct, pct * (audio.duration || 0));
   }
-  function dragEnd() {
-    if (!draggingProgress) return;
-    draggingProgress = false;
-    if (pendingPct !== null && audio.duration) {
-      audio.currentTime = pendingPct * audio.duration;
-      isSeeking = true;
-      setTimeout(() => { isSeeking = false; }, 300);
-      pendingPct = null;
-    }
+
+  function onDragMove(e) {
+    if (!isDragging) return;
+    const pct = progressPct(e);
+    setProgressUI(pct);
+    showTooltip(pct, pct * (audio.duration || 0));
   }
-  progressWrap.addEventListener('mousedown',  e => { draggingProgress=true; pendingPct=progressPct(e); updateProgress(pendingPct); e.preventDefault(); });
-  progressWrap.addEventListener('touchstart', e => { draggingProgress=true; pendingPct=progressPct(e); updateProgress(pendingPct); }, {passive:true});
-  window.addEventListener('mousemove',  dragMove);
-  window.addEventListener('touchmove',  dragMove, {passive:true});
-  window.addEventListener('mouseup',    dragEnd);
-  window.addEventListener('touchend',   dragEnd);
+
+  function onDragEnd(e) {
+    if (!isDragging) return;
+    isDragging = false;
+    const pct = progressPct(e.changedTouches ? e : e);
+    // 恢复 transition，之后底层的微小关键帧纠正会被平滑掉
+    enableTransition();
+    // 立刻把视觉锁在用户选择的位置
+    visualHoldPct = pct;
+    isVisualHold  = true;
+    setProgressUI(pct);
+    // 触发底层 seek（会依次触发 seeking → seeked）
+    if (audio.duration) audio.currentTime = pct * audio.duration;
+  }
+
+  progressWrap.addEventListener('mousedown',  e => { onDragStart(e); e.preventDefault(); });
+  progressWrap.addEventListener('touchstart', e => { onDragStart(e); }, {passive:true});
+  window.addEventListener('mousemove',  onDragMove);
+  window.addEventListener('touchmove',  onDragMove, {passive:true});
+  window.addEventListener('mouseup',    onDragEnd);
+  window.addEventListener('touchend',   onDragEnd);
 
   // ── Visualizer ──
   const canvas = document.getElementById('viz-canvas');
@@ -331,18 +392,14 @@ HTML = """
 
   let barBins = null;
 
-  // ── CHANGE 1 & 2: 单向左→右，log映射 60Hz~5000Hz 铺满全部44根柱子 ──
   function buildBarBins() {
     const sampleRate = audioCtx.sampleRate;
     const totalBins  = analyser.frequencyBinCount;
     const hzPerBin   = sampleRate / analyser.fftSize;
-
     const freqMin = 60;
     const freqMax = 2600;
-
     barBins = new Array(BAR_COUNT);
     for (let i = 0; i < BAR_COUNT; i++) {
-      // i=0 → freqMin, i=BAR_COUNT-1 → freqMax, log scale
       const t    = i / (BAR_COUNT - 1);
       const freq = freqMin * Math.pow(freqMax / freqMin, t);
       barBins[i] = Math.min(Math.round(freq / hzPerBin), totalBins - 1);
@@ -386,28 +443,19 @@ HTML = """
       if (analyser && dataArray) {
         if (!barBins) buildBarBins();
         analyser.getByteFrequencyData(dataArray);
-
         for (let i = 0; i < BAR_COUNT; i++) {
           const raw = dataArray[barBins[i]] / 255;
-
-          // ── CHANGE 3: 基于柱子位置的EQ动态权重 ──
-          // t=0 → 最左低频, t=1 → 最右高频
-          // 低频: 1.5, 中频: 1.0, 高频: 2.5+ (三段平滑插值)
           const t = i / (BAR_COUNT - 1);
           let eqGain;
           if (t < 0.07) {
-                // 最左 ~3 格：极度压缩，raw=0.8 × 0.1 = 0.08 → 约8%
-                eqGain = 0.1;
-            } else if (t < 0.65) {
-                // 低中频 → 中频：从 0.1 平滑爬升到 1.0，中间最高
-                eqGain = 0.1 + Math.pow((t - 0.07) / 0.58, 0.8) * 1.4;
-            } else {
-                // 高频：大力拉升补偿弱信号，raw=0.03 × 6 = 0.18 → 约18%可见
-                eqGain = 1.0 + Math.pow((t - 0.65) / 0.35, 1.0) * 5.0;
-            }
-
-          const boosted  = Math.min(1, raw * eqGain);
-          const barMax = t < 0.65 ? MAX_H : MAX_H - Math.pow((t - 0.65) / 0.35, 0.7) * 16;
+            eqGain = 0.1;
+          } else if (t < 0.65) {
+            eqGain = 0.1 + Math.pow((t - 0.07) / 0.58, 0.8) * 1.4;
+          } else {
+            eqGain = 1.0 + Math.pow((t - 0.65) / 0.35, 1.0) * 5.0;
+          }
+          const boosted = Math.min(1, raw * eqGain);
+          const barMax  = t < 0.65 ? MAX_H : MAX_H - Math.pow((t - 0.65) / 0.35, 0.7) * 16;
           bars[i].target = MIN_H + boosted * (barMax - MIN_H);
         }
       } else {
