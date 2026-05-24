@@ -96,7 +96,7 @@ HTML = """
     color:#6A6A6A;
     letter-spacing:0.02em;
     line-height:1.6;
-    margin-bottom:0rem;
+    margin-bottom:2.5rem;
     animation:fadeUp 1.6s ease-out 2s both;
   }
   .player-block {
