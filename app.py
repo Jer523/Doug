@@ -235,6 +235,81 @@ HTML = """
 </div>
 
 <p class="footnote">Douglas</p>
+<canvas id="confetti-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;"></canvas>
+
+  // ========== 纸屑炮 ==========
+  (function() {
+    const cc     = document.getElementById('confetti-canvas');
+    const cx     = cc.getContext('2d');
+    const COLORS = ['#E8A0BF','#F4C842','#6EC6E6','#A8D8A8','#C4A0E8','#F4855A','#7EC8C8','#F4E04D'];
+    const TOTAL  = 160;
+    let particles = [];
+    let startedAt = null;
+    const DURATION = 2800; // ms
+
+    function resize() {
+      cc.width  = window.innerWidth;
+      cc.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    function spawn() {
+      particles = [];
+      for (let i = 0; i < TOTAL; i++) {
+        const fromLeft = i < TOTAL / 2;
+        const x = fromLeft ? 0 : cc.width;
+        const angle = fromLeft
+          ? (-60 + Math.random() * 80) * Math.PI / 180   // 向右上方
+          : (-120 + Math.random() * 80) * Math.PI / 180; // 向左上方
+        const speed = 6 + Math.random() * 10;
+        particles.push({
+          x,
+          y: cc.height * (0.3 + Math.random() * 0.3),
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          color: COLORS[Math.floor(Math.random() * COLORS.length)],
+          w: 6 + Math.random() * 6,
+          h: 3 + Math.random() * 4,
+          rot: Math.random() * Math.PI * 2,
+          rotV: (Math.random() - 0.5) * 0.25,
+          opacity: 1,
+        });
+      }
+    }
+
+    function tick(now) {
+      if (!startedAt) startedAt = now;
+      const elapsed = now - startedAt;
+      if (elapsed > DURATION) {
+        cx.clearRect(0, 0, cc.width, cc.height);
+        return; // 动画结束
+      }
+      cx.clearRect(0, 0, cc.width, cc.height);
+      const fade = Math.max(0, 1 - elapsed / DURATION);
+      for (const p of particles) {
+        p.x   += p.vx;
+        p.y   += p.vy;
+        p.vy  += 0.28;          // 重力
+        p.vx  *= 0.985;         // 空气阻力
+        p.rot += p.rotV;
+        cx.save();
+        cx.globalAlpha = fade * p.opacity;
+        cx.translate(p.x, p.y);
+        cx.rotate(p.rot);
+        cx.fillStyle = p.color;
+        cx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        cx.restore();
+      }
+      requestAnimationFrame(tick);
+    }
+
+    // 与标题淡入同步启动（delay 0.5s）
+    setTimeout(() => {
+      spawn();
+      requestAnimationFrame(tick);
+    }, 500);
+  })();
 
 <script>
   // ========== DOM 元素 ==========
