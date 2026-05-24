@@ -188,17 +188,17 @@ HTML = """
     pointer-events:none;
   }
   .footnote {
-    position:fixed;
-    z-index:10000;
-    bottom:1.6rem;
-    left:0; right:0;
-    text-align:center;
-    font-size:9px;
-    color:#C0B8B0;
-    letter-spacing:2em;
-    text-transform:uppercase;
-    opacity: 0;   /* 初始透明，交由动画控制 */
-    animation: fadeUp 1.2s ease-out 1.5s forwards;  /* 1.5秒后开始淡入，动画结束后保持可见 */
+    position: fixed;
+    z-index: 10000;
+    bottom: 1.6rem;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 9px;
+    color: #C0B8B0;
+    letter-spacing: 2em;
+    text-transform: uppercase;
+    opacity: 1 !important;
   }
 </style>
 </head>
