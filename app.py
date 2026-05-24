@@ -55,12 +55,9 @@ HTML = """
     flex-direction:column;
     align-items:center;
     text-align:center;
-    padding:26vh 2rem 4rem 2rem;   /* 底部留出空间给 footnote */
+    padding:26vh 2rem 0 2rem;
     max-width:560px;
     margin:0 auto;
-    min-height:100vh;              /* 确保页面至少撑满整个视口 */
-    position:relative;             /* 让内部绝对定位的 footnote 以此为基准 */
-    box-sizing:border-box;
   }
   .title {
     font-size:50px;
@@ -190,21 +187,8 @@ HTML = """
     transition:opacity 0.2s;
     pointer-events:none;
   }
-  .footnote {
-    position:absolute;
-    z-index:10000;
-    bottom:1.2rem;
-    left:50%;
-    transform:translateX(-50%);
-    text-align:center;
-    font-size:9px;
-    color:#C0B8B0;
-    letter-spacing:2em;
-    text-transform:uppercase;
-    opacity:1 !important;
-    white-space:nowrap;
-    pointer-events:none;   /* 避免遮挡按钮 */
-  }
+
+  /* 不在这里定义 .footnote，完全由 JS 控制 */
 </style>
 </head>
 <body>
@@ -237,11 +221,13 @@ HTML = """
         </div>
       </div>
     </div>
-  <p class="footnote">Douglas</p>
+
   </div>
 </div>
 
+<p class="footnote">Douglas</p>
 <canvas id="confetti-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;"></canvas>
+
 <script>
   // ========== 纸屑炮 ==========
   (function() {
@@ -251,7 +237,7 @@ HTML = """
     const TOTAL  = 160;
     let particles = [];
     let startedAt = null;
-    const DURATION = 4000; // ms
+    const DURATION = 4000;
 
     function resize() {
       cc.width  = window.innerWidth;
@@ -267,8 +253,7 @@ HTML = """
         const x = fromLeft ? -10 : cc.width + 10;
         const angle = fromLeft
           ? (-75 + Math.random() * 65) * Math.PI / 180
-                : (-170 + Math.random() * 65) * Math.PI / 180;
-        
+          : (-170 + Math.random() * 65) * Math.PI / 180;
         const speed = 1.5 + Math.random() * 10;
         particles.push({
           x,
@@ -290,15 +275,15 @@ HTML = """
       const elapsed = now - startedAt;
       if (elapsed > DURATION) {
         cx.clearRect(0, 0, cc.width, cc.height);
-        return; // 动画结束
+        return;
       }
       cx.clearRect(0, 0, cc.width, cc.height);
       const fade = Math.max(0, 1 - elapsed / DURATION);
       for (const p of particles) {
         p.x   += p.vx;
         p.y   += p.vy;
-        p.vy  += 0.28;          // 重力
-        p.vx  *= 0.985;         // 空气阻力
+        p.vy  += 0.28;
+        p.vx  *= 0.985;
         p.rot += p.rotV;
         cx.save();
         cx.globalAlpha = fade * p.opacity;
@@ -311,7 +296,6 @@ HTML = """
       requestAnimationFrame(tick);
     }
 
-    // 与标题淡入同步启动（delay 0.5s）
     setTimeout(() => {
       spawn();
       requestAnimationFrame(tick);
@@ -429,7 +413,6 @@ HTML = """
   }
 
   // ========== 安全淡入/淡出 ==========
-  // 极短淡出 (5ms) 用于消除停止时的咔嚓
   function fadeOutQuick() {
     if (!gainNode) return;
     const now = audioCtx.currentTime;
@@ -438,7 +421,6 @@ HTML = """
     gainNode.gain.linearRampToValueAtTime(0, now + 0.005);
   }
 
-  // 从 0 淡入到 1，时长 40ms（加强过滤）
   function fadeInSmooth() {
     if (!gainNode) return;
     const now = audioCtx.currentTime;
@@ -447,7 +429,6 @@ HTML = """
     gainNode.gain.linearRampToValueAtTime(1.0, now + 0.04);
   }
 
-  // 立即归零（用于静音包裹）
   function muteInstant() {
     if (!gainNode) return;
     const now = audioCtx.currentTime;
@@ -465,30 +446,21 @@ HTML = """
   }
 
   function playFrom(offset) {
-    // 先快速淡出旧声，然后停止
     fadeOutQuick();
     setTimeout(() => {
       stopSource();
       if (!audioBuffer || !gainNode) return;
-
-      // 创建新的 source
       sourceNode = audioCtx.createBufferSource();
       sourceNode.buffer = audioBuffer;
       sourceNode.connect(analyser);
-
       startOffset = offset;
       startTime = audioCtx.currentTime;
-      // 确保增益归零后再启动 source
       muteInstant();
       sourceNode.start(0, offset);
-
-      // 微小延迟后开始淡入（让 source 稳定）
       setTimeout(fadeInSmooth, 10);
-
       isPlaying = true;
       iconPlay.style.display  = 'none';
       iconPause.style.display = 'block';
-
       sourceNode.onended = () => {
         if (isPlaying && sourceNode) {
           const elapsed = audioCtx.currentTime - startTime;
@@ -503,14 +475,13 @@ HTML = """
           }
         }
       };
-    }, 6); // 5ms 淡出完成后停止
+    }, 6);
   }
 
   function pause() {
     if (!isPlaying) return;
     const elapsed = audioCtx.currentTime - startTime;
     pausedAt = Math.min(startOffset + elapsed, duration);
-    // 先快速淡出，再停止 source
     fadeOutQuick();
     setTimeout(() => {
       stopSource();
@@ -550,7 +521,6 @@ HTML = """
     draggingProgress = false;
     fill.style.transition    = 'width 0.15s ease-out';
     scrubber.style.transition = 'left 0.15s ease-out';
-
     if (lastDragPct !== null && duration) {
       const targetTime = lastDragPct * duration;
       pausedAt = targetTime;
@@ -560,7 +530,6 @@ HTML = """
         updateProgress(lastDragPct);
       }
     }
-
     visualBufferTimeout = setTimeout(() => {
       visualBufferActive = false;
       if (!draggingProgress && !isPlaying) {
@@ -608,7 +577,7 @@ HTML = """
   }
   updateTimeDisplay();
 
-  // ========== 可视化（保持不变） ==========
+  // ========== 可视化 ==========
   const canvas = document.getElementById('viz-canvas');
   const ctx    = canvas.getContext('2d');
   const BAR_COUNT = 44;
@@ -701,13 +670,47 @@ HTML = """
   }
   drawViz();
 
+  // ========== 强制显示 footnote ==========
+  (function fixFootnote() {
+    const fn = document.querySelector('.footnote');
+    if (!fn) return;
+    Object.assign(fn.style, {
+      position: 'fixed',
+      bottom: '1.6rem',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      zIndex: '99999',
+      opacity: '1',
+      color: '#C0B8B0',
+      fontSize: '9px',
+      letterSpacing: '2em',
+      textTransform: 'uppercase',
+      pointerEvents: 'none',
+      whiteSpace: 'nowrap',
+      margin: '0',
+      padding: '0',
+      background: 'transparent',
+      border: 'none',
+      display: 'block',
+      visibility: 'visible',
+    });
+    document.body.style.minHeight = '100vh';
+    document.body.style.position = 'relative';
+    try {
+      const iframe = window.frameElement;
+      if (iframe) {
+        iframe.style.height = window.innerHeight + 'px';
+      }
+    } catch(e) {}
+  })();
+
   // 清理
   window.addEventListener('beforeunload', () => {
     stopSource();
     if (audioCtx) audioCtx.close();
   });
 
-  // Streamlit 全屏 iframe
+  // Streamlit 全屏 iframe 调整
   try {
     window.parent.document.querySelectorAll('iframe').forEach(f => {
       f.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:'+window.screen.height+'px;border:none;z-index:99999;';
