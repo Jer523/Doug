@@ -75,7 +75,7 @@ HTML = """
     letter-spacing:0.02em;
     line-height:1.6;
     margin-bottom:3rem;
-    animation:fadeUp 1.6s ease-out 1.5s both;
+    animation:fadeUp 1.6s ease-out 2s both;
   }
   .player-block {
     width:100%;
