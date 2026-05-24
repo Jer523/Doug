@@ -288,29 +288,38 @@ HTML = """
   audio.addEventListener('play',  () => { iconPlay.style.display='none';  iconPause.style.display='block'; });
   audio.addEventListener('pause', () => { iconPlay.style.display='block'; iconPause.style.display='none';  });
   audio.addEventListener('ended', () => { iconPlay.style.display='block'; iconPause.style.display='none'; updateProgress(0); });
-  audio.addEventListener('timeupdate', () => {
-    if (audio.duration) updateProgress(audio.currentTime / audio.duration);
+    audio.addEventListener('timeupdate', () => {
+    if (!draggingProgress && audio.duration)
+      updateProgress(audio.currentTime / audio.duration);
   });
+
+    let pendingPct = null;
 
   function progressPct(e) {
     const rect = progressWrap.getBoundingClientRect();
     const x = e.touches ? e.touches[0].clientX : e.clientX;
     return Math.max(0, Math.min(1, (x - rect.left) / rect.width));
   }
-  function doSeek(e) {
-    const pct = progressPct(e);
-    updateProgress(pct);
-    if (audio.duration) {
-      audio.currentTime = pct * audio.duration;
-      showTooltip(pct, audio.currentTime);
+  function dragMove(e) {
+    if (!draggingProgress) return;
+    pendingPct = progressPct(e);
+    updateProgress(pendingPct);
+    showTooltip(pendingPct, pendingPct * (audio.duration || 0));
+  }
+  function dragEnd() {
+    if (!draggingProgress) return;
+    draggingProgress = false;
+    if (pendingPct !== null && audio.duration) {
+      audio.currentTime = pendingPct * audio.duration;
+      pendingPct = null;
     }
   }
-  progressWrap.addEventListener('mousedown',  e => { draggingProgress=true; doSeek(e); e.preventDefault(); });
-  progressWrap.addEventListener('touchstart', e => { draggingProgress=true; doSeek(e); }, {passive:true});
-  window.addEventListener('mousemove',  e => { if(draggingProgress) doSeek(e); });
-  window.addEventListener('touchmove',  e => { if(draggingProgress) doSeek(e); }, {passive:true});
-  window.addEventListener('mouseup',    () => draggingProgress=false);
-  window.addEventListener('touchend',   () => { draggingProgress=false; });
+  progressWrap.addEventListener('mousedown',  e => { draggingProgress=true; pendingPct=progressPct(e); updateProgress(pendingPct); e.preventDefault(); });
+  progressWrap.addEventListener('touchstart', e => { draggingProgress=true; pendingPct=progressPct(e); updateProgress(pendingPct); }, {passive:true});
+  window.addEventListener('mousemove',  dragMove);
+  window.addEventListener('touchmove',  dragMove, {passive:true});
+  window.addEventListener('mouseup',    dragEnd);
+  window.addEventListener('touchend',   dragEnd);
 
   // ── Visualizer ──
   const canvas = document.getElementById('viz-canvas');
@@ -394,9 +403,9 @@ HTML = """
           const bin = barBins[i];
           const raw = dataArray[bin] / 255;
 
-          // 3. EQ gain: smoothly ramp from 0.85 (low) to 2.15 (high)
+          // 3. EQ gain
           const t      = i / (BAR_COUNT - 1);
-          const eqGain = 0.85 + t * 1.3;
+          const eqGain = 0.7 + t * 3.5;
           const boosted = Math.min(1, raw * eqGain);
 
           bars[i].target = MIN_H + boosted * (MAX_H - MIN_H);
