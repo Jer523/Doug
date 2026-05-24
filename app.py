@@ -83,7 +83,7 @@ HTML = """
     animation:fadeUp 1.4s ease-out 2.5s both;
   }
   .divider {
-    width:86px;
+    width:260px;
     height:1px;
     background:#C8BFB0;
     margin:0 auto 2rem auto;
