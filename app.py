@@ -154,6 +154,7 @@ HTML = """
     width:0%;
     background:#9B8B75;
     border-radius:1px;
+    transition: width 0.15s ease-out;
   }
   #scrubber {
     position:absolute;
@@ -162,6 +163,7 @@ HTML = """
     width:9px; height:9px;
     border-radius:50%;
     background:#9B8B75;
+    transition: left 0.15s ease-out;
   }
   #time-tooltip {
     position:absolute;
@@ -235,9 +237,12 @@ HTML = """
   const progressWrap = document.getElementById('progress-wrap');
   const tooltip      = document.getElementById('time-tooltip');
 
-  let tooltipTimer     = null;
-  let draggingProgress = false;
-  let isSeeking        = false;
+  let tooltipTimer        = null;
+  let draggingProgress    = false;
+  let isSeeking           = false;
+  let visualBufferActive  = false;
+  let visualBufferTimeout = null;
+  let lastDragPct         = null;
 
   let audioCtx  = null;
   let analyser  = null;
@@ -263,6 +268,7 @@ HTML = """
     if (!isFinite(s) || isNaN(s) || s < 0) return '';
     return Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0');
   }
+  
   function showTooltip(pct, t) {
     const label = fmt(t);
     if (!label) return;
@@ -272,56 +278,126 @@ HTML = """
     clearTimeout(tooltipTimer);
     tooltipTimer = setTimeout(() => tooltip.style.opacity='0', 1500);
   }
+  
   function updateProgress(pct) {
     fill.style.width    = (pct*100) + '%';
     scrubber.style.left = (pct*100) + '%';
   }
 
-  document.getElementById('play-btn').addEventListener('click', () => {
-    initWebAudio();
-    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-    audio.paused ? audio.play().catch(()=>{}) : audio.pause();
+  // ==================== CRITICAL FIX: Seeking Event Handlers ====================
+  
+  audio.addEventListener('seeking', () => {
+    isSeeking = true;
   });
-  audio.addEventListener('play',  () => { iconPlay.style.display='none';  iconPause.style.display='block'; });
-  audio.addEventListener('pause', () => { iconPlay.style.display='block'; iconPause.style.display='none';  });
-  audio.addEventListener('ended', () => { iconPlay.style.display='block'; iconPause.style.display='none'; updateProgress(0); });
+
+  audio.addEventListener('seeked', () => {
+    // Activate visual buffer to prevent timeupdate from causing jumps
+    visualBufferActive = true;
+    clearTimeout(visualBufferTimeout);
+    
+    // Keep the UI at the dragged position for a brief period
+    if (lastDragPct !== null && audio.duration) {
+      updateProgress(lastDragPct);
+    }
+    
+    // Release the visual buffer after 150ms - enough to hide keyframe alignment jumps
+    visualBufferTimeout = setTimeout(() => {
+      visualBufferActive = false;
+      isSeeking = false;
+      // Sync to actual position after buffer expires
+      if (!draggingProgress && audio.duration) {
+        updateProgress(audio.currentTime / audio.duration);
+      }
+    }, 150);
+  });
+
+  // ==================== Critical Timeupdate Handler ====================
+  
   audio.addEventListener('timeupdate', () => {
-    if (!draggingProgress && !isSeeking && audio.duration)
+    // Only update if we're not in any special state
+    if (!draggingProgress && !isSeeking && !visualBufferActive && audio.duration) {
       updateProgress(audio.currentTime / audio.duration);
+    }
   });
 
-  let pendingPct = null;
-
+  // ==================== Drag Handlers ====================
+  
   function progressPct(e) {
     const rect = progressWrap.getBoundingClientRect();
     const x = e.touches ? e.touches[0].clientX : e.clientX;
     return Math.max(0, Math.min(1, (x - rect.left) / rect.width));
   }
+  
   function dragMove(e) {
     if (!draggingProgress) return;
-    pendingPct = progressPct(e);
-    updateProgress(pendingPct);
-    showTooltip(pendingPct, pendingPct * (audio.duration || 0));
+    lastDragPct = progressPct(e);
+    updateProgress(lastDragPct);
+    showTooltip(lastDragPct, lastDragPct * (audio.duration || 0));
   }
+  
+  function dragStart(e) {
+    draggingProgress = true;
+    lastDragPct = progressPct(e);
+    updateProgress(lastDragPct);
+    
+    // Remove CSS transitions during drag for immediate response
+    fill.style.transition = 'none';
+    scrubber.style.transition = 'none';
+    
+    e.preventDefault();
+  }
+  
   function dragEnd() {
     if (!draggingProgress) return;
     draggingProgress = false;
-    if (pendingPct !== null && audio.duration) {
-      audio.currentTime = pendingPct * audio.duration;
-      isSeeking = true;
-      setTimeout(() => { isSeeking = false; }, 300);
-      pendingPct = null;
+    
+    // Restore CSS transitions for smooth settling
+    fill.style.transition = 'width 0.15s ease-out';
+    scrubber.style.transition = 'left 0.15s ease-out';
+    
+    if (lastDragPct !== null && audio.duration) {
+      const targetTime = lastDragPct * audio.duration;
+      audio.currentTime = targetTime;
+      // isSeeking will be set by the 'seeking' event
+      // visualBufferActive will be set by the 'seeked' event
+      lastDragPct = null;
     }
   }
 
-  progressWrap.addEventListener('mousedown',  e => { draggingProgress=true; pendingPct=progressPct(e); updateProgress(pendingPct); e.preventDefault(); });
-  progressWrap.addEventListener('touchstart', e => { draggingProgress=true; pendingPct=progressPct(e); updateProgress(pendingPct); }, {passive:true});
-  window.addEventListener('mousemove',  dragMove);
-  window.addEventListener('touchmove',  dragMove, {passive:true});
-  window.addEventListener('mouseup',    dragEnd);
-  window.addEventListener('touchend',   dragEnd);
+  // Event listeners for dragging
+  progressWrap.addEventListener('mousedown', dragStart);
+  progressWrap.addEventListener('touchstart', dragStart, {passive: false});
+  window.addEventListener('mousemove', dragMove);
+  window.addEventListener('touchmove', dragMove, {passive: false});
+  window.addEventListener('mouseup', dragEnd);
+  window.addEventListener('touchend', dragEnd);
 
-  // ── Visualizer ──
+  // ==================== Play/Pause ====================
+  
+  document.getElementById('play-btn').addEventListener('click', () => {
+    initWebAudio();
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    audio.paused ? audio.play().catch(()=>{}) : audio.pause();
+  });
+  
+  audio.addEventListener('play',  () => { 
+    iconPlay.style.display='none';  
+    iconPause.style.display='block'; 
+  });
+  
+  audio.addEventListener('pause', () => { 
+    iconPlay.style.display='block'; 
+    iconPause.style.display='none';  
+  });
+  
+  audio.addEventListener('ended', () => { 
+    iconPlay.style.display='block'; 
+    iconPause.style.display='none'; 
+    updateProgress(0); 
+  });
+
+  // ==================== Visualizer (unchanged) ====================
+  
   const canvas = document.getElementById('viz-canvas');
   const ctx    = canvas.getContext('2d');
 
@@ -332,7 +408,6 @@ HTML = """
 
   let barBins = null;
 
-  // ── CHANGE 1 & 2: 单向左→右，log映射 60Hz~5000Hz 铺满全部44根柱子 ──
   function buildBarBins() {
     const sampleRate = audioCtx.sampleRate;
     const totalBins  = analyser.frequencyBinCount;
@@ -343,7 +418,6 @@ HTML = """
 
     barBins = new Array(BAR_COUNT);
     for (let i = 0; i < BAR_COUNT; i++) {
-      // i=0 → freqMin, i=BAR_COUNT-1 → freqMax, log scale
       const t    = i / (BAR_COUNT - 1);
       const freq = freqMin * Math.pow(freqMax / freqMin, t);
       barBins[i] = Math.min(Math.round(freq / hzPerBin), totalBins - 1);
@@ -366,7 +440,7 @@ HTML = """
     const dpr  = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
     canvas.width  = rect.width * dpr;
-    canvas.height = 28         * dpr;
+    canvas.height = 28 * dpr;
     ctx.scale(dpr, dpr);
   }
   resizeCanvas();
@@ -390,20 +464,13 @@ HTML = """
 
         for (let i = 0; i < BAR_COUNT; i++) {
           const raw = dataArray[barBins[i]] / 255;
-
-          // ── CHANGE 3: 基于柱子位置的EQ动态权重 ──
-          // t=0 → 最左低频, t=1 → 最右高频
-          // 低频: 1.5, 中频: 1.0, 高频: 2.5+ (三段平滑插值)
           const t = i / (BAR_COUNT - 1);
           let eqGain;
           if (t < 0.07) {
-                // 最左 ~3 格：极度压缩，raw=0.8 × 0.1 = 0.08 → 约8%
                 eqGain = 0.1;
             } else if (t < 0.65) {
-                // 低中频 → 中频：从 0.1 平滑爬升到 1.0，中间最高
                 eqGain = 0.1 + Math.pow((t - 0.07) / 0.58, 0.8) * 1.4;
             } else {
-                // 高频：大力拉升补偿弱信号，raw=0.03 × 6 = 0.18 → 约18%可见
                 eqGain = 1.0 + Math.pow((t - 0.65) / 0.35, 1.0) * 5.0;
             }
 
