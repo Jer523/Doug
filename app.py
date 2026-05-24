@@ -402,7 +402,7 @@ HTML = """
                 eqGain = 0.4 + ((t - 0.4) / 0.25) * 0.3;
             } else {
                 // 高频：保持你的设定不变
-                eqGain = 1.0 + Math.pow((t - 0.65) / 0.35, 1.5) * 0.2;
+                eqGain = 1.0 + Math.pow((t - 0.65) / 0.35, 1.5) * 0.02;
             }
 
           const boosted  = Math.min(1, raw * eqGain);
