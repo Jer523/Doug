@@ -337,7 +337,7 @@ HTML = """
     const hzPerBin   = sampleRate / analyser.fftSize;
 
     const freqMin = 60;
-    const freqMax = 3500;
+    const freqMax = 2900;
 
     barBins = new Array(BAR_COUNT);
     for (let i = 0; i < BAR_COUNT; i++) {
