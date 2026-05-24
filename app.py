@@ -96,7 +96,6 @@ HTML = """
     line-height:1.6;
   }
 
-  /* viz-wrap: same left edge as progress bar */
   .viz-wrap {
     width:100%;
     max-width:270px;
@@ -111,7 +110,6 @@ HTML = """
     height:28px;
   }
 
-  /* Player row */
   .player-wrap {
     width:100%;
     max-width:270px;
@@ -251,12 +249,13 @@ HTML = """
     try {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 512;                   // 256 bins, better resolution
-      analyser.smoothingTimeConstant = 0.7;
+      analyser.fftSize = 2048;
+      // 4. 延音平滑：模拟钢琴余音
+      analyser.smoothingTimeConstant = 0.85;
       const source = audioCtx.createMediaElementSource(audio);
       source.connect(analyser);
       analyser.connect(audioCtx.destination);
-      dataArray = new Uint8Array(analyser.frequencyBinCount); // 256
+      dataArray = new Uint8Array(analyser.frequencyBinCount); // 1024 bins
     } catch(e) {
       console.warn('Web Audio unavailable:', e);
     }
@@ -313,21 +312,45 @@ HTML = """
   window.addEventListener('touchend',   () => { draggingProgress=false; });
 
   // ── Visualizer ──
-  const canvas  = document.getElementById('viz-canvas');
-  const ctx     = canvas.getContext('2d');
+  const canvas = document.getElementById('viz-canvas');
+  const ctx    = canvas.getContext('2d');
 
   const BAR_COUNT = 44;
-  const HALF      = BAR_COUNT / 2;   // 22 bars per side
-  const BAR_GAP   = 2;               // fixed gap
-  // BAR_W is computed dynamically each frame from canvas size
+  const BAR_GAP   = 2;
+  const MAX_H     = 24;
+  const MIN_H     = 2;
 
-  const MAX_H = 24;
-  const MIN_H = 2;
+  // 2. 频率上限：截断在 9000Hz，去除钢琴无效死区
+  const FREQ_MIN = 40;    // Hz — 钢琴最低音 A0 ≈ 27.5Hz
+  const FREQ_MAX = 9000;  // Hz — 截断极高频
+
+  // 预计算每根 bar 对应的 FFT bin（对数映射，在 initWebAudio 后计算）
+  let barBins = null;
+
+  function buildBarBins() {
+    // fftSize=2048 → 1024 bins, each bin = sampleRate/fftSize Hz
+    const sampleRate = audioCtx.sampleRate;
+    const totalBins  = analyser.frequencyBinCount; // 1024
+    const hzPerBin   = sampleRate / (analyser.fftSize);
+
+    // 1. 对数频率映射：log scale from FREQ_MIN to FREQ_MAX
+    const logMin = Math.log10(FREQ_MIN);
+    const logMax = Math.log10(FREQ_MAX);
+
+    barBins = [];
+    for (let i = 0; i < BAR_COUNT; i++) {
+      // t goes 0 (left/low) → 1 (right/high)
+      const t   = i / (BAR_COUNT - 1);
+      const hz  = Math.pow(10, logMin + t * (logMax - logMin));
+      const bin = Math.round(hz / hzPerBin);
+      barBins.push(Math.min(bin, totalBins - 1));
+    }
+  }
 
   const bars = Array.from({length: BAR_COUNT}, () => ({
     h: MIN_H,
     target: MIN_H,
-    speed: 0.2 + Math.random() * 0.1
+    speed: 0.18 + Math.random() * 0.08
   }));
 
   if (!CanvasRenderingContext2D.prototype.roundRect) {
@@ -354,39 +377,36 @@ HTML = """
     const H   = canvas.height / dpr;
     ctx.clearRect(0, 0, W, H);
 
-    // Dynamic bar width: fill canvas exactly, no overflow, no gaps
-    const BAR_W = (W - (BAR_COUNT - 1) * BAR_GAP) / BAR_COUNT;
-
+    const BAR_W  = (W - (BAR_COUNT - 1) * BAR_GAP) / BAR_COUNT;
     const playing = !audio.paused && !audio.ended;
 
     if (playing) {
       if (analyser && dataArray) {
-        analyser.getByteFrequencyData(dataArray);
-        // Mirror symmetry: index 0 = outermost edge, HALF-1 = innermost (centre)
-        // Bin 0 is DC — skip it. Map HALF bars linearly across bins 1..60
-        // This covers piano's main frequency range (roughly 170Hz–10kHz)
-        for (let i = 0; i < HALF; i++) {
-          // i=0 → outermost bar → higher freq bin
-          // i=HALF-1 → innermost bar → bin 1 (lowest non-DC)
-          const t        = i / (HALF - 1);                     // 0=outer,1=inner
-          const binIndex = 1 + Math.round((1 - t) * 59);       // bins 1..60, inner=low, outer=high
-          const raw      = dataArray[binIndex] / 255;           // 0..1, no DC
-          // Moderate boost — Brahms is dynamic, don't clip
-          const boosted  = Math.min(1, raw * 2.2);
-          const target   = MIN_H + boosted * (MAX_H - MIN_H);
+        // Build barBins once after Web Audio is ready
+        if (!barBins) buildBarBins();
 
-          bars[HALF - 1 - i].target = target;  // left half: index HALF-1=centre → 0=edge
-          bars[HALF + i].target     = target;  // right half: index HALF=centre → BAR_COUNT-1=edge
+        analyser.getByteFrequencyData(dataArray);
+
+        for (let i = 0; i < BAR_COUNT; i++) {
+          const bin = barBins[i];
+          const raw = dataArray[bin] / 255; // 0..1
+
+          // 3. EQ 补偿：高频 bar 获得渐进增益
+          // t=0 → 低频无增益，t=1 → 高频最大增益
+          const t       = i / (BAR_COUNT - 1);
+          // 低频段（t<0.4）轻微压制，中高频逐渐提升
+          const eqGain  = 0.85 + t * 1.3;
+          const boosted = Math.min(1, raw * eqGain);
+
+          bars[i].target = MIN_H + boosted * (MAX_H - MIN_H);
         }
       } else {
         // Fallback random until Web Audio initialises
         tickCount++;
         if (tickCount >= 5) {
           tickCount = 0;
-          for (let i = 0; i < HALF; i++) {
-            const t = MIN_H + Math.random() * (MAX_H - MIN_H);
-            bars[HALF - 1 - i].target = t;
-            bars[HALF + i].target     = t;
+          for (let i = 0; i < BAR_COUNT; i++) {
+            bars[i].target = MIN_H + Math.random() * (MAX_H - MIN_H);
           }
         }
       }
@@ -394,7 +414,6 @@ HTML = """
       for (let i = 0; i < BAR_COUNT; i++) bars[i].target = MIN_H;
     }
 
-    // Draw
     let x = 0;
     for (let i = 0; i < BAR_COUNT; i++) {
       bars[i].h += (bars[i].target - bars[i].h) * bars[i].speed;
