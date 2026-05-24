@@ -55,9 +55,12 @@ HTML = """
     flex-direction:column;
     align-items:center;
     text-align:center;
-    padding:26vh 2rem 0 2rem;
+    padding:26vh 2rem 4rem 2rem;   /* 底部留出空间给 footnote */
     max-width:560px;
     margin:0 auto;
+    min-height:100vh;              /* 确保页面至少撑满整个视口 */
+    position:relative;             /* 让内部绝对定位的 footnote 以此为基准 */
+    box-sizing:border-box;
   }
   .title {
     font-size:50px;
@@ -188,17 +191,19 @@ HTML = """
     pointer-events:none;
   }
   .footnote {
-    position: fixed;
-    z-index: 10000;
-    bottom: 1.6rem;
-    left: 0;
-    right: 0;
-    text-align: center;
-    font-size: 9px;
-    color: #C0B8B0;
-    letter-spacing: 2em;
-    text-transform: uppercase;
-    opacity: 1 !important;
+    position:absolute;
+    z-index:10000;
+    bottom:1.2rem;
+    left:50%;
+    transform:translateX(-50%);
+    text-align:center;
+    font-size:9px;
+    color:#C0B8B0;
+    letter-spacing:2em;
+    text-transform:uppercase;
+    opacity:1 !important;
+    white-space:nowrap;
+    pointer-events:none;   /* 避免遮挡按钮 */
   }
 </style>
 </head>
