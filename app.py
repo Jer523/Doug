@@ -337,7 +337,7 @@ HTML = """
     const hzPerBin   = sampleRate / analyser.fftSize;
 
     const freqMin = 60;
-    const freqMax = 5000;
+    const freqMax = 4000;
 
     barBins = new Array(BAR_COUNT);
     for (let i = 0; i < BAR_COUNT; i++) {
@@ -399,7 +399,7 @@ HTML = """
                 eqGain = 0.1;
             } else if (t < 0.65) {
                 // 低中频 → 中频：从 0.1 平滑爬升到 1.0，中间最高
-                eqGain = 0.1 + Math.pow((t - 0.07) / 0.58, 0.8) * 0.9;
+                eqGain = 0.1 + Math.pow((t - 0.07) / 0.58, 0.8) * 1.4;
             } else {
                 // 高频：大力拉升补偿弱信号，raw=0.03 × 6 = 0.18 → 约18%可见
                 eqGain = 1.0 + Math.pow((t - 0.65) / 0.35, 1.0) * 5.0;
