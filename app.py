@@ -24,7 +24,7 @@ html, body,
 /* 脚注样式：延迟淡入、居中、可调大小字间距 */
 .footnote-streamlit {
     position: fixed;
-    bottom: 0rem;
+    bottom: 1.6rem;
     left: calc(50% + 9px);
     transform: translateX(-50%);
     font-size: 7.5px !important;
