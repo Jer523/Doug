@@ -21,19 +21,26 @@ html, body,
     margin: 0 !important;
     overflow: hidden !important;
 }
-/* 脚注样式 */
+/* 脚注样式：延迟淡入、居中、可调大小字间距 */
 .footnote-streamlit {
     position: fixed;
     bottom: 1.6rem;
-    left: 0;
-    right: 0;
-    text-align: center;
-    font-size: 9px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;                /* 可改大，例如 11px */
     color: #C0B8B0;
-    letter-spacing: 2em;
+    letter-spacing: 2em;           /* 可改 2.5em 等 */
     text-transform: uppercase;
     z-index: 10000;
     pointer-events: none;
+    white-space: nowrap;
+    opacity: 0;                    /* 初始透明 */
+    animation: footnoteFadeIn 1.2s ease-out 1.5s forwards;  /* 1.5秒后淡入 */
+}
+
+@keyframes footnoteFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
 }
 </style>
 """, unsafe_allow_html=True)
