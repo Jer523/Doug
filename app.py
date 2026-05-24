@@ -198,10 +198,6 @@ HTML = """
     <div class="divider"></div>
     <p class="track">Brahms: Intermezzo Op. 118, No. 2 (1893)</p>
 
-    <audio id="audio-el" preload="none" crossorigin="anonymous" muted>
-      <source src="__AUDIO_URL__" type="audio/mpeg">
-    </audio>
-
     <div class="viz-container">
       <canvas id="viz-canvas"></canvas>
     </div>
@@ -229,72 +225,39 @@ HTML = """
 <p class="footnote">Douglas</p>
 
 <script>
-  const audio        = document.getElementById('audio-el');
+  // ========== DOM 元素 ==========
   const iconPlay     = document.getElementById('icon-play');
   const iconPause    = document.getElementById('icon-pause');
   const fill         = document.getElementById('progress-fill');
   const scrubber     = document.getElementById('scrubber');
   const progressWrap = document.getElementById('progress-wrap');
   const tooltip      = document.getElementById('time-tooltip');
+  const playBtn      = document.getElementById('play-btn');
+
+  // ========== 状态 ==========
+  let audioCtx      = null;
+  let audioBuffer   = null;   // 解码后的完整音频
+  let gainNode      = null;
+  let analyser      = null;
+  let dataArray     = null;
+
+  let sourceNode    = null;   // 当前正在播放的 AudioBufferSourceNode
+  let startTime     = 0;      // audioCtx.currentTime 当 source 启动时
+  let startOffset   = 0;      // source.start 的偏移（秒）
+  let pausedAt      = 0;      // 暂停时的播放位置（秒）
+  let isPlaying     = false;
+  let duration      = 0;
 
   let tooltipTimer        = null;
   let draggingProgress    = false;
+  let lastDragPct         = null;
   let visualBufferActive  = false;
   let visualBufferTimeout = null;
-  let lastDragPct         = null;
 
-  let audioCtx    = null;
-  let analyser    = null;
-  let gainNode    = null;
-  let dataArray   = null;
-  let isUserPlaying = false;   // 用户期望的播放状态
+  // 动画帧
+  let animationFrame = null;
 
-  function initWebAudio() {
-    if (audioCtx) return;
-    try {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 2048;
-      analyser.smoothingTimeConstant = 0.75;
-      gainNode = audioCtx.createGain();
-      gainNode.gain.value = 0; // 开始静音，等用户点播放再淡入
-      const source = audioCtx.createMediaElementSource(audio);
-      source.connect(analyser);
-      analyser.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-      dataArray = new Uint8Array(analyser.frequencyBinCount);
-      // 确保原生元素静音（已经完全通过 Web Audio 输出）
-      audio.muted = true;
-    } catch(e) {
-      console.warn('Web Audio unavailable:', e);
-    }
-  }
-
-  // 立即将增益设为 0
-  function muteNow() {
-    if (!gainNode) return;
-    const now = audioCtx.currentTime;
-    gainNode.gain.cancelScheduledValues(now);
-    gainNode.gain.setValueAtTime(0, now);
-  }
-
-  // 立即将增益设为 1（不淡入）
-  function unmuteNow() {
-    if (!gainNode) return;
-    const now = audioCtx.currentTime;
-    gainNode.gain.cancelScheduledValues(now);
-    gainNode.gain.setValueAtTime(1, now);
-  }
-
-  // 20ms 快速淡入
-  function fadeIn() {
-    if (!gainNode) return;
-    const now = audioCtx.currentTime;
-    gainNode.gain.cancelScheduledValues(now);
-    gainNode.gain.setValueAtTime(0, now);
-    gainNode.gain.linearRampToValueAtTime(1.0, now + 0.02);
-  }
-
+  // ========== 工具函数 ==========
   function fmt(s) {
     if (!isFinite(s) || isNaN(s) || s < 0) return '';
     return Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0');
@@ -313,140 +276,199 @@ HTML = """
     scrubber.style.left = (pct*100) + '%';
   }
 
-  // ---------- 视觉缓冲期 ----------
-  audio.addEventListener('seeking', () => {
-    visualBufferActive = true;
-  });
-  audio.addEventListener('seeked', () => {
-    clearTimeout(visualBufferTimeout);
-    if (lastDragPct !== null && audio.duration) {
-      updateProgress(lastDragPct);
-    }
-    visualBufferTimeout = setTimeout(() => {
-      visualBufferActive = false;
-      if (!draggingProgress && audio.duration) {
-        updateProgress(audio.currentTime / audio.duration);
-      }
-    }, 150);
-  });
-  audio.addEventListener('timeupdate', () => {
-    if (!draggingProgress && !visualBufferActive && audio.duration) {
-      updateProgress(audio.currentTime / audio.duration);
-    }
-  });
+  // ========== 核心：初始化音频上下文并加载解码音频 ==========
+  async function initAudio() {
+    if (audioCtx && audioBuffer) return; // 已初始化
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = 0.75;
+      gainNode = audioCtx.createGain();
+      gainNode.gain.value = 0;   // 开始静音，避免任何噪声
+      analyser.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-  // ---------- 拖拽逻辑 ----------
+      // 下载并解码音频
+      const response = await fetch("__AUDIO_URL__");
+      const arrayBuffer = await response.arrayBuffer();
+      audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+      duration = audioBuffer.duration;
+    } catch(e) {
+      console.error('音频初始化失败:', e);
+    }
+  }
+
+  // 安全停止当前播放的 source（如果有）
+  function stopSource() {
+    if (sourceNode) {
+      try { sourceNode.stop(0); } catch(e) {}
+      sourceNode.disconnect();
+      sourceNode = null;
+    }
+  }
+
+  // 从指定偏移（秒）开始播放，并立即淡入
+  function playFrom(offset) {
+    stopSource(); // 先停掉旧的
+
+    if (!audioBuffer || !gainNode) return;
+    // 创建新 source
+    sourceNode = audioCtx.createBufferSource();
+    sourceNode.buffer = audioBuffer;
+    sourceNode.connect(analyser); // 经过分析器 → 增益 → destination
+
+    // 设置开始时间和偏移
+    startOffset = offset;
+    startTime = audioCtx.currentTime;
+    sourceNode.start(0, offset);
+
+    // 增益瞬时置零（确保零起点），然后快速淡入
+    const now = audioCtx.currentTime;
+    gainNode.gain.cancelScheduledValues(now);
+    gainNode.gain.setValueAtTime(0, now);
+    gainNode.gain.linearRampToValueAtTime(1.0, now + 0.02);
+
+    isPlaying = true;
+    iconPlay.style.display = 'none';
+    iconPause.style.display = 'block';
+
+    // 当 source 自然播完时，重置为暂停状态
+    sourceNode.onended = () => {
+      if (isPlaying && sourceNode) {
+        // 检查是否真的是因为播完了（而不是被新 source 替换）
+        const elapsed = audioCtx.currentTime - startTime;
+        const endPos = startOffset + elapsed;
+        if (endPos >= duration - 0.1) {
+          // 自然结束
+          stopSource();
+          isPlaying = false;
+          pausedAt = duration;
+          iconPlay.style.display = 'block';
+          iconPause.style.display = 'none';
+          updateProgress(1);
+          // 增益保持在 1 也无所谓，因为没有声音了
+        }
+      }
+    };
+  }
+
+  // 暂停：停止 source，记录当前位置，但不改变增益（静音由下一次播放处理）
+  function pause() {
+    if (!isPlaying) return;
+    // 计算当前播放位置
+    const elapsed = audioCtx.currentTime - startTime;
+    pausedAt = Math.min(startOffset + elapsed, duration);
+    stopSource();
+    isPlaying = false;
+    iconPlay.style.display = 'block';
+    iconPause.style.display = 'none';
+    // 增益不需要动，保持静音也可以（反正没有声音）
+  }
+
+  // 停止所有声音并重置
+  function stopAll() {
+    stopSource();
+    isPlaying = false;
+    pausedAt = 0;
+    iconPlay.style.display = 'block';
+    iconPause.style.display = 'none';
+    updateProgress(0);
+  }
+
+  // ========== 进度条拖拽逻辑（与之前类似，但调用 playFrom） ==========
   function progressPct(e) {
     const rect = progressWrap.getBoundingClientRect();
     const x = e.touches ? e.touches[0].clientX : e.clientX;
     return Math.max(0, Math.min(1, (x - rect.left) / rect.width));
   }
+
   function dragMove(e) {
     if (!draggingProgress) return;
     lastDragPct = progressPct(e);
     updateProgress(lastDragPct);
-    showTooltip(lastDragPct, lastDragPct * (audio.duration || 0));
+    showTooltip(lastDragPct, lastDragPct * (duration || 0));
   }
+
   function dragStart(e) {
     draggingProgress = true;
     lastDragPct = progressPct(e);
     updateProgress(lastDragPct);
-    fill.style.transition    = 'none';
+    fill.style.transition = 'none';
     scrubber.style.transition = 'none';
+    visualBufferActive = true;   // 拖拽期间屏蔽 timeupdate 视觉更新
+    clearTimeout(visualBufferTimeout);
     e.preventDefault();
   }
-  async function dragEnd() {
+
+  function dragEnd() {
     if (!draggingProgress) return;
     draggingProgress = false;
-    fill.style.transition    = 'width 0.15s ease-out';
+    fill.style.transition = 'width 0.15s ease-out';
     scrubber.style.transition = 'left 0.15s ease-out';
 
-    if (lastDragPct !== null && audio.duration) {
-      const targetTime = lastDragPct * audio.duration;
-      // 1. 确保增益为 0（静音环境）
-      muteNow();
+    if (lastDragPct !== null && duration) {
+      const targetTime = lastDragPct * duration;
+      pausedAt = targetTime;   // 记录新位置
 
-      // 2. 设置时间
-      audio.currentTime = targetTime;
-
-      // 3. 等待 seek 完成
-      await new Promise(resolve => {
-        const onSeeked = () => {
-          audio.removeEventListener('seeked', onSeeked);
-          resolve();
-        };
-        audio.addEventListener('seeked', onSeeked, { once: true });
-      });
-
-      // 4. 如果用户正在播放状态，则淡入恢复声音
-      if (isUserPlaying) {
-        // 如果音频因为 ended 等原因暂停了，需要重新启动底层播放
-        if (audio.paused) {
-          // 注意：即使 paused，也不会有原生噪声，因为 muted=true
-          await audio.play().catch(()=>{});
-        }
-        fadeIn();   // 平滑淡入
+      if (isPlaying) {
+        // 如果正在播放，直接跳到新位置并播放（内部已处理淡入静音）
+        playFrom(targetTime);
+      } else {
+        // 暂停状态，只更新 UI
+        updateProgress(lastDragPct);
       }
-      // 若用户处于暂停状态，保持增益 0，不用动
     }
+
+    // 视觉缓冲期（避免跳回）
+    visualBufferTimeout = setTimeout(() => {
+      visualBufferActive = false;
+      if (!draggingProgress && !isPlaying) {
+        updateProgress(pausedAt / duration);
+      }
+    }, 150);
   }
 
-  progressWrap.addEventListener('mousedown',  dragStart);
+  progressWrap.addEventListener('mousedown', dragStart);
   progressWrap.addEventListener('touchstart', dragStart, {passive: false});
-  window.addEventListener('mousemove',  dragMove);
-  window.addEventListener('touchmove',  dragMove, {passive: false});
-  window.addEventListener('mouseup',    dragEnd);
-  window.addEventListener('touchend',   dragEnd);
+  window.addEventListener('mousemove', dragMove);
+  window.addEventListener('touchmove', dragMove, {passive: false});
+  window.addEventListener('mouseup', dragEnd);
+  window.addEventListener('touchend', dragEnd);
 
-  // ---------- 播放/暂停按钮 ----------
-  document.getElementById('play-btn').addEventListener('click', async () => {
-    initWebAudio();
-    if (audioCtx && audioCtx.state === 'suspended') {
+  // ========== 播放/暂停按钮 ==========
+  playBtn.addEventListener('click', async () => {
+    await initAudio();  // 第一次点击时加载音频
+    if (audioCtx.state === 'suspended') {
       await audioCtx.resume();
     }
 
-    if (!isUserPlaying) {
-      // === 开始播放 ===
-      if (audio.ended) {
-        audio.currentTime = 0;
-      }
-      if (audio.paused) {
-        // 底层启动播放（静音，无噪声）
-        muteNow();  // 双重保险
-        await audio.play().catch(()=>{});
-      }
-      // 现在音频在播放，增益为 0，开始淡入
-      fadeIn();
-      isUserPlaying = true;
-      iconPlay.style.display  = 'none';
-      iconPause.style.display = 'block';
+    if (isPlaying) {
+      pause();
     } else {
-      // === 暂停：不暂停底层播放，只静音 ===
-      muteNow();
-      isUserPlaying = false;
-      iconPlay.style.display  = 'block';
-      iconPause.style.display = 'none';
+      // 从暂停位置开始播放
+      playFrom(pausedAt);
     }
   });
 
-  // 自然结束时的处理
-  audio.addEventListener('ended', () => {
-    isUserPlaying = false;
-    iconPlay.style.display  = 'block';
-    iconPause.style.display = 'none';
-    updateProgress(0);
-    // 增益归 1 以便下次播放（但 muted 仍会使原生静音，所以安全）
-    unmuteNow();
-  });
-
-  // 确保页面关闭时清理（非必须，但良好实践）
-  window.addEventListener('beforeunload', () => {
-    if (gainNode) {
-      gainNode.gain.cancelScheduledValues(0);
+  // ========== 进度条自动更新（仅用于非拖拽时平滑移动） ==========
+  function updateTimeDisplay() {
+    if (!draggingProgress && !visualBufferActive && isPlaying) {
+      const elapsed = audioCtx.currentTime - startTime;
+      const pos = startOffset + elapsed;
+      if (pos <= duration) {
+        updateProgress(pos / duration);
+      }
+    } else if (!isPlaying && !draggingProgress && !visualBufferActive) {
+      // 保持暂停位置显示
+      if (duration) updateProgress(pausedAt / duration);
     }
-  });
+    animationFrame = requestAnimationFrame(updateTimeDisplay);
+  }
+  updateTimeDisplay();
 
-  // ── 可视化（不变）──
+  // ========== 可视化（保持不变，但 analyser 数据会随 source 变化） ==========
   const canvas = document.getElementById('viz-canvas');
   const ctx    = canvas.getContext('2d');
   const BAR_COUNT = 44;
@@ -497,35 +519,31 @@ HTML = """
     const W   = canvas.width  / dpr;
     const H   = canvas.height / dpr;
     ctx.clearRect(0, 0, W, H);
-    const BAR_W   = (W - (BAR_COUNT - 1) * BAR_GAP) / BAR_COUNT;
-    const playing = !audio.paused && !audio.ended && isUserPlaying;
+    const BAR_W = (W - (BAR_COUNT - 1) * BAR_GAP) / BAR_COUNT;
+    const playing = isPlaying;
 
-    if (playing) {
-      if (analyser && dataArray) {
-        if (!barBins) buildBarBins();
-        analyser.getByteFrequencyData(dataArray);
-        for (let i = 0; i < BAR_COUNT; i++) {
-          const raw = dataArray[barBins[i]] / 255;
-          const t = i / (BAR_COUNT - 1);
-          let eqGain;
-          if (t < 0.07) { eqGain = 0.1; }
-          else if (t < 0.65) { eqGain = 0.1 + Math.pow((t - 0.07) / 0.58, 0.8) * 1.4; }
-          else { eqGain = 1.0 + Math.pow((t - 0.65) / 0.35, 1.0) * 5.0; }
-          const boosted = Math.min(1, raw * eqGain);
-          const barMax = t < 0.65 ? MAX_H : MAX_H - Math.pow((t - 0.65) / 0.35, 0.7) * 16;
-          bars[i].target = MIN_H + boosted * (barMax - MIN_H);
-        }
-      } else {
-        tickCount++;
-        if (tickCount >= 5) {
-          tickCount = 0;
-          for (let i = 0; i < BAR_COUNT; i++) {
-            bars[i].target = MIN_H + Math.random() * (MAX_H - MIN_H);
-          }
-        }
+    if (playing && analyser && dataArray) {
+      if (!barBins) buildBarBins();
+      analyser.getByteFrequencyData(dataArray);
+      for (let i = 0; i < BAR_COUNT; i++) {
+        const raw = dataArray[barBins[i]] / 255;
+        const t = i / (BAR_COUNT - 1);
+        let eqGain;
+        if (t < 0.07) { eqGain = 0.1; }
+        else if (t < 0.65) { eqGain = 0.1 + Math.pow((t - 0.07) / 0.58, 0.8) * 1.4; }
+        else { eqGain = 1.0 + Math.pow((t - 0.65) / 0.35, 1.0) * 5.0; }
+        const boosted = Math.min(1, raw * eqGain);
+        const barMax = t < 0.65 ? MAX_H : MAX_H - Math.pow((t - 0.65) / 0.35, 0.7) * 16;
+        bars[i].target = MIN_H + boosted * (barMax - MIN_H);
       }
     } else {
-      for (let i = 0; i < BAR_COUNT; i++) bars[i].target = MIN_H;
+      tickCount++;
+      if (tickCount >= 5) {
+        tickCount = 0;
+        for (let i = 0; i < BAR_COUNT; i++) {
+          bars[i].target = MIN_H + (playing ? Math.random() * (MAX_H - MIN_H) : 0);
+        }
+      }
     }
 
     let x = 0;
@@ -543,6 +561,12 @@ HTML = """
     requestAnimationFrame(drawViz);
   }
   drawViz();
+
+  // 窗口关闭时清理
+  window.addEventListener('beforeunload', () => {
+    stopSource();
+    if (audioCtx) audioCtx.close();
+  });
 
   try {
     window.parent.document.querySelectorAll('iframe').forEach(f => {
