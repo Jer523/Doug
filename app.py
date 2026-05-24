@@ -114,6 +114,7 @@ HTML = """
     display:flex;
     align-items:center;
     gap:14px;
+    padding-left:5px;
   }
 
   #play-btn {
