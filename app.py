@@ -309,9 +309,7 @@ HTML = """
     if (pendingPct !== null && audio.duration) {
       audio.currentTime = pendingPct * audio.duration;
       isSeeking = true;
-      audio.addEventListener('seeked', () => {
-        isSeeking = false;
-      }, { once: true });
+      setTimeout(() => { isSeeking = false; }, 300);
       pendingPct = null;
     }
   }
