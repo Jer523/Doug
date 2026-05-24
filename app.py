@@ -309,10 +309,13 @@ HTML = """
     if (pendingPct !== null && audio.duration) {
       audio.currentTime = pendingPct * audio.duration;
       isSeeking = true;
-      setTimeout(() => { isSeeking = false; }, 300);
+      audio.addEventListener('seeked', () => {
+        isSeeking = false;
+      }, { once: true });
       pendingPct = null;
     }
   }
+
   progressWrap.addEventListener('mousedown',  e => { draggingProgress=true; pendingPct=progressPct(e); updateProgress(pendingPct); e.preventDefault(); });
   progressWrap.addEventListener('touchstart', e => { draggingProgress=true; pendingPct=progressPct(e); updateProgress(pendingPct); }, {passive:true});
   window.addEventListener('mousemove',  dragMove);
