@@ -269,20 +269,47 @@ HTML = """
   }
 
   // 淡出20ms → 执行操作 → 淡入20ms，消除咔哒声
+    const FADE_S = 0.06;
+  const FADE_MS = FADE_S * 1000 + 20;
+
   function fadeAndDo(action) {
     if (!gainNode) { action(); return; }
     const g   = gainNode.gain;
     const now = audioCtx.currentTime;
     g.cancelScheduledValues(now);
     g.setValueAtTime(g.value, now);
-    g.linearRampToValueAtTime(0, now + 0.02);
+    g.linearRampToValueAtTime(0, now + FADE_S);
     setTimeout(() => {
       action();
       const t = audioCtx.currentTime;
       g.setValueAtTime(0, t);
-      g.linearRampToValueAtTime(1.0, t + 0.02);
-    }, 25);
+      g.linearRampToValueAtTime(1.0, t + FADE_S);
+    }, FADE_MS);
   }
+
+  function fadeSeekFadeIn(targetTime) {
+    if (!gainNode) { audio.currentTime = targetTime; return; }
+    const g   = gainNode.gain;
+    const now = audioCtx.currentTime;
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(g.value, now);
+    g.linearRampToValueAtTime(0, now + FADE_S);
+    setTimeout(() => {
+      const onSeeked = () => {
+        clearTimeout(fallback);
+        setTimeout(() => {
+          const t = audioCtx.currentTime;
+          g.cancelScheduledValues(t);
+          g.setValueAtTime(0, t);
+          g.linearRampToValueAtTime(1.0, t + FADE_S);
+        }, 30);
+      };
+      const fallback = setTimeout(onSeeked, 400);
+      audio.addEventListener('seeked', onSeeked, { once: true });
+      audio.currentTime = targetTime;
+    }, FADE_MS);
+  }
+
 
   function fmt(s) {
     if (!isFinite(s) || isNaN(s) || s < 0) return '';
@@ -358,7 +385,7 @@ HTML = """
     scrubber.style.transition = 'left 0.15s ease-out';
     if (lastDragPct !== null && audio.duration) {
       const targetTime = lastDragPct * audio.duration;
-      fadeAndDo(() => { audio.currentTime = targetTime; });
+            fadeSeekFadeIn(targetTime);
     }
   }
 
