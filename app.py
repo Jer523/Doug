@@ -98,7 +98,7 @@ HTML = """
 
   .viz-container {
     width:100%;
-    max-width:230px;
+    max-width:240px;
     margin:0 auto 10px auto;
   }
   #viz-canvas {
