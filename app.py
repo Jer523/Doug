@@ -405,7 +405,7 @@ HTML = """
 
           // 3. EQ gain
           const t      = i / (BAR_COUNT - 1);
-          const eqGain = 0.7 + t * 3.5;
+          const eqGain = 0.7 + t * 10;
           const boosted = Math.min(1, raw * eqGain);
 
           bars[i].target = MIN_H + boosted * (MAX_H - MIN_H);
