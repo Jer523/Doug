@@ -96,7 +96,6 @@ HTML = """
     line-height:1.6;
   }
 
-  /* ── 1. Visualizer 独立容器，完全居中 ── */
   .viz-container {
     width:100%;
     max-width:250px;
@@ -108,7 +107,6 @@ HTML = """
     height:28px;
   }
 
-  /* ── 2. 播放控件独立容器，完全居中 ── */
   .player-container {
     width:100%;
     max-width:270px;
@@ -201,12 +199,10 @@ HTML = """
       <source src="__AUDIO_URL__" type="audio/mpeg">
     </audio>
 
-    <!-- 上行：Visualizer 独立居中 -->
     <div class="viz-container">
       <canvas id="viz-canvas"></canvas>
     </div>
 
-    <!-- 下行：播放控件独立居中 -->
     <div class="player-container">
       <button id="play-btn">
         <svg id="icon-play" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
@@ -239,8 +235,8 @@ HTML = """
   const tooltip      = document.getElementById('time-tooltip');
 
   let tooltipTimer     = null;
-    let draggingProgress = false;
-    let isSeeking        = false;
+  let draggingProgress = false;
+  let isSeeking        = false;
 
   // ── Web Audio ──
   let audioCtx  = null;
@@ -253,11 +249,11 @@ HTML = """
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       analyser = audioCtx.createAnalyser();
       analyser.fftSize = 2048;
-      analyser.smoothingTimeConstant = 0.85;
+      analyser.smoothingTimeConstant = 0.75;
       const source = audioCtx.createMediaElementSource(audio);
       source.connect(analyser);
       analyser.connect(audioCtx.destination);
-      dataArray = new Uint8Array(analyser.frequencyBinCount); // 1024 bins
+      dataArray = new Uint8Array(analyser.frequencyBinCount);
     } catch(e) {
       console.warn('Web Audio unavailable:', e);
     }
@@ -289,12 +285,12 @@ HTML = """
   audio.addEventListener('play',  () => { iconPlay.style.display='none';  iconPause.style.display='block'; });
   audio.addEventListener('pause', () => { iconPlay.style.display='block'; iconPause.style.display='none';  });
   audio.addEventListener('ended', () => { iconPlay.style.display='block'; iconPause.style.display='none'; updateProgress(0); });
-      audio.addEventListener('timeupdate', () => {
+  audio.addEventListener('timeupdate', () => {
     if (!draggingProgress && !isSeeking && audio.duration)
       updateProgress(audio.currentTime / audio.duration);
   });
 
-    let pendingPct = null;
+  let pendingPct = null;
 
   function progressPct(e) {
     const rect = progressWrap.getBoundingClientRect();
@@ -307,7 +303,7 @@ HTML = """
     updateProgress(pendingPct);
     showTooltip(pendingPct, pendingPct * (audio.duration || 0));
   }
-    function dragEnd() {
+  function dragEnd() {
     if (!draggingProgress) return;
     draggingProgress = false;
     if (pendingPct !== null && audio.duration) {
@@ -329,42 +325,34 @@ HTML = """
   const ctx    = canvas.getContext('2d');
 
   const BAR_COUNT = 44;
+  const HALF      = BAR_COUNT / 2;
   const BAR_GAP   = 2;
   const MAX_H     = 24;
   const MIN_H     = 2;
 
-  const FREQ_MIN = 40;
-  const FREQ_MAX = 4500;
-
-  // barBins[i] = which FFT bin index bar i reads from
-  // Built once after audioCtx is ready (we need sampleRate)
   let barBins = null;
 
+  // ── THE FIX: buildBarBins now actually builds barBins ──
   function buildBarBins() {
-    const sampleRate = audioCtx.sampleRate;          // typically 44100 or 48000
-    const totalBins  = analyser.frequencyBinCount;   // 1024
-    const hzPerBin   = sampleRate / analyser.fftSize; // e.g. 44100/2048 ≈ 21.5 Hz
+    const sampleRate = audioCtx.sampleRate;
+    const totalBins  = analyser.frequencyBinCount;
+    const hzPerBin   = sampleRate / analyser.fftSize;
 
-    // 1. Find the bin index that corresponds to FREQ_MAX
-    //    This is the cutoff — we only use bins 0..maxBin
-    const maxBin = Math.min(
-      Math.round(FREQ_MAX / hzPerBin),
-      totalBins - 1
-    );
+    // Map HALF bars on a log scale from 60Hz to 5000Hz
+    // i=0 is innermost (centre) = lowest freq
+    // i=HALF-1 is outermost (edge) = highest freq
+    const freqMin = 60;
+    const freqMax = 5000;
 
-    // 2. Log-scale mapping from FREQ_MIN..FREQ_MAX → bars 0..BAR_COUNT-1
-    //    Then remap those bins to 0..maxBin (i.e., fill the full width)
-    function dragEnd() {
-        if (!draggingProgress) return;
-        draggingProgress = false;
-        if (pendingPct !== null && audio.duration) {
-          audio.currentTime = pendingPct * audio.duration;
-          isSeeking = true;
-          setTimeout(() => { isSeeking = false; }, 300);
-          pendingPct = null;
-        }
-      }
-
+    barBins = new Array(BAR_COUNT);
+    for (let i = 0; i < HALF; i++) {
+      const t      = i / (HALF - 1);
+      const freq   = freqMin * Math.pow(freqMax / freqMin, t);
+      const bin    = Math.min(Math.round(freq / hzPerBin), totalBins - 1);
+      // Mirror: innermost = centre pair, outermost = edges
+      barBins[HALF - 1 - i] = bin;   // left half
+      barBins[HALF + i]     = bin;   // right half
+    }
   }
 
   const bars = Array.from({length: BAR_COUNT}, () => ({
@@ -404,16 +392,9 @@ HTML = """
       if (analyser && dataArray) {
         if (!barBins) buildBarBins();
         analyser.getByteFrequencyData(dataArray);
-
         for (let i = 0; i < BAR_COUNT; i++) {
-          const bin = barBins[i];
-          const raw = dataArray[bin] / 255;
-
-          // 3. EQ gain
-          const t      = i / (BAR_COUNT - 1);
-          const eqGain = 1.0 + Math.pow(t, 4) * 20;
-          const boosted = Math.min(1, raw * eqGain);
-
+          const raw     = dataArray[barBins[i]] / 255;
+          const boosted = Math.min(1, raw * 2.0);
           bars[i].target = MIN_H + boosted * (MAX_H - MIN_H);
         }
       } else {
