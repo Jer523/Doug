@@ -655,7 +655,7 @@ HTML = """
         else if (t < 0.65) { eqGain = 0.1 + Math.pow((t - 0.07) / 0.58, 0.8) * 1.4; }
         else { eqGain = 1.0 + Math.pow((t - 0.65) / 0.35, 1.0) * 5.0; }
         const boosted = Math.min(1, raw * eqGain);
-        const barMax = t < 0.65 ? MAX_H : MAX_H - Math.pow((t - 0.65) / 0.35, 0.7) * 10;
+        const barMax = t < 0.65 ? MAX_H : MAX_H - Math.pow((t - 0.65) / 0.35, 0.7) * 15;
         bars[i].target = MIN_H + boosted * (barMax - MIN_H);
       }
     } else {
