@@ -239,15 +239,15 @@ HTML = """
 
   let tooltipTimer        = null;
   let draggingProgress    = false;
-  let isSeeking           = false;
   let visualBufferActive  = false;
   let visualBufferTimeout = null;
   let lastDragPct         = null;
 
-  let audioCtx  = null;
-  let analyser  = null;
-  let gainNode  = null;
-  let dataArray = null;
+  let audioCtx    = null;
+  let analyser    = null;
+  let gainNode    = null;
+  let dataArray   = null;
+  let isUserPlaying = false;   // 用户期望的播放状态（完全由增益控制）
 
   function initWebAudio() {
     if (audioCtx) return;
@@ -268,28 +268,28 @@ HTML = """
     }
   }
 
-  // 安全淡出：将增益在极短时间内拉到 0，并返回一个在增益稳定为 0 后 resolve 的 Promise
-  function fadeOutQuick() {
-    return new Promise((resolve) => {
-      if (!gainNode) return resolve();
-      const g = gainNode.gain;
-      const now = audioCtx.currentTime;
-      g.cancelScheduledValues(now);
-      g.setValueAtTime(g.value, now);
-      g.linearRampToValueAtTime(0, now + 0.01); // 10ms 快速淡出
-      // 确保增益为 0 后继续执行
-      setTimeout(resolve, 20);
-    });
+  // 立即静音
+  function muteNow() {
+    if (!gainNode) return;
+    gainNode.gain.cancelScheduledValues(audioCtx.currentTime);
+    gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
   }
 
-  // 安全淡入：从 0 拉回 1
-  function fadeInQuick() {
+  // 立即恢复音量
+  function unmuteNow() {
+    if (!gainNode) return;
+    gainNode.gain.cancelScheduledValues(audioCtx.currentTime);
+    gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime);
+  }
+
+  // 快速淡入（20ms）
+  function fadeIn() {
     if (!gainNode) return;
     const g = gainNode.gain;
     const now = audioCtx.currentTime;
     g.cancelScheduledValues(now);
     g.setValueAtTime(0, now);
-    g.linearRampToValueAtTime(1.0, now + 0.02); // 20ms 淡入
+    g.linearRampToValueAtTime(1.0, now + 0.02);
   }
 
   function fmt(s) {
@@ -312,19 +312,18 @@ HTML = """
     scrubber.style.left = (pct*100) + '%';
   }
 
+  // ---------- 视觉缓冲期（依旧保留） ----------
   audio.addEventListener('seeking', () => {
-    isSeeking = true;
+    visualBufferActive = true;
   });
 
   audio.addEventListener('seeked', () => {
-    visualBufferActive = true;
     clearTimeout(visualBufferTimeout);
     if (lastDragPct !== null && audio.duration) {
       updateProgress(lastDragPct);
     }
     visualBufferTimeout = setTimeout(() => {
       visualBufferActive = false;
-      isSeeking = false;
       if (!draggingProgress && audio.duration) {
         updateProgress(audio.currentTime / audio.duration);
       }
@@ -332,11 +331,12 @@ HTML = """
   });
 
   audio.addEventListener('timeupdate', () => {
-    if (!draggingProgress && !isSeeking && !visualBufferActive && audio.duration) {
+    if (!draggingProgress && !visualBufferActive && audio.duration) {
       updateProgress(audio.currentTime / audio.duration);
     }
   });
 
+  // ---------- 拖拽逻辑 ----------
   function progressPct(e) {
     const rect = progressWrap.getBoundingClientRect();
     const x = e.touches ? e.touches[0].clientX : e.clientX;
@@ -367,28 +367,31 @@ HTML = """
 
     if (lastDragPct !== null && audio.duration) {
       const targetTime = lastDragPct * audio.duration;
+      // 1. 立即静音
+      muteNow();
 
-      // 1. 先快速淡出并暂停（消除播放态下的 seek 杂音）
-      await fadeOutQuick();
-      const wasPlaying = !audio.paused;
-      audio.pause();
-
-      // 2. 等待暂停稳定后设置时间
+      // 2. 设置时间
       audio.currentTime = targetTime;
 
-      // 3. 等待 seek 完成，若之前是播放状态则恢复播放并淡入
-      if (wasPlaying) {
+      // 3. 等待浏览器完成 seek（关键帧对齐）
+      await new Promise(resolve => {
         const onSeeked = () => {
           audio.removeEventListener('seeked', onSeeked);
-          audio.play().catch(()=>{});
-          fadeInQuick();
+          resolve();
         };
         audio.addEventListener('seeked', onSeeked, { once: true });
+      });
+
+      // 4. 根据用户期望的播放状态决定是否恢复音量
+      if (isUserPlaying) {
+        // 如果因为某些原因音频暂停了（如 ended），重新播放
+        if (audio.paused) {
+          await audio.play().catch(()=>{});
+        }
+        fadeIn();   // 淡入回 1
       } else {
-        // 若本来暂停，只需同步一次进度显示
-        fadeInQuick(); // 增益拉回正常（虽然不播放但保持增益为 1 供下次播放）
-        // 手动更新一次进度，以免视觉残留
-        updateProgress(targetTime / audio.duration);
+        // 保持静音（无声播放）
+        // 不需要额外操作，增益已经是 0
       }
     }
   }
@@ -400,39 +403,63 @@ HTML = """
   window.addEventListener('mouseup',    dragEnd);
   window.addEventListener('touchend',   dragEnd);
 
-  // 播放/暂停按钮：同样采用淡出/淡入保障静音切换
+  // ---------- 播放/暂停按钮（核心变化） ----------
   document.getElementById('play-btn').addEventListener('click', async () => {
     initWebAudio();
-    if (audioCtx && audioCtx.state === 'suspended') await audioCtx.resume();
+    if (audioCtx && audioCtx.state === 'suspended') {
+      await audioCtx.resume();
+    }
 
-    if (audio.paused) {
-      // 将要播放：增益先拉到 0，播放后再淡入
-      if (gainNode) {
-        gainNode.gain.cancelScheduledValues(audioCtx.currentTime);
-        gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+    if (!isUserPlaying) {
+      // === 用户想要“播放” ===
+      if (audio.ended) {
+        audio.currentTime = 0;
       }
-      await audio.play().catch(()=>{});
-      fadeInQuick();
+
+      // 如果音频尚未启动（第一次播放或 ended 后），需要真正 play
+      if (audio.paused) {
+        muteNow();                      // 先静音
+        await audio.play().catch(()=>{});
+      }
+
+      // 现在音频一定在播放（可能已播放但静音），开始淡入
+      fadeIn();
+      isUserPlaying = true;
+      iconPlay.style.display  = 'none';
+      iconPause.style.display = 'block';
     } else {
-      // 暂停：先快速淡出，再暂停
-      await fadeOutQuick();
-      audio.pause();
-      // 增益拉回 1 以备下次播放
-      fadeInQuick();
+      // === 用户想要“暂停”（不调用 audio.pause()） ===
+      muteNow();
+      isUserPlaying = false;
+      iconPlay.style.display  = 'block';
+      iconPause.style.display = 'none';
     }
   });
 
-  audio.addEventListener('play',  () => { iconPlay.style.display='none';  iconPause.style.display='block'; });
-  audio.addEventListener('pause', () => { iconPlay.style.display='block'; iconPause.style.display='none';  });
-  audio.addEventListener('ended', () => { iconPlay.style.display='block'; iconPause.style.display='none'; updateProgress(0); });
+  // 音频自然结束时重置状态
+  audio.addEventListener('ended', () => {
+    isUserPlaying = false;
+    iconPlay.style.display  = 'block';
+    iconPause.style.display = 'none';
+    updateProgress(0);
+    // 保持增益为 1，因为音频已停止，无影响
+    unmuteNow();
+  });
 
-  // ── 可视化部分（不变） ──
+  // 确保加载后增益正常
+  audio.addEventListener('loadedmetadata', () => {
+    // 如果此前用户还没点击播放，增益保持在 1 没问题
+  });
+
+  // ── 可视化（不变）──
   const canvas = document.getElementById('viz-canvas');
   const ctx    = canvas.getContext('2d');
+
   const BAR_COUNT = 44;
   const BAR_GAP   = 2;
   const MAX_H     = 24;
   const MIN_H     = 2;
+
   let barBins = null;
 
   function buildBarBins() {
@@ -472,13 +499,16 @@ HTML = """
   window.addEventListener('resize', resizeCanvas);
 
   let tickCount = 0;
+
   function drawViz() {
     const dpr = window.devicePixelRatio || 1;
     const W   = canvas.width  / dpr;
     const H   = canvas.height / dpr;
     ctx.clearRect(0, 0, W, H);
+
     const BAR_W   = (W - (BAR_COUNT - 1) * BAR_GAP) / BAR_COUNT;
-    const playing = !audio.paused && !audio.ended;
+    const playing = !audio.paused && !audio.ended && isUserPlaying; // 视觉上跟随用户意图
+
     if (playing) {
       if (analyser && dataArray) {
         if (!barBins) buildBarBins();
@@ -506,6 +536,7 @@ HTML = """
     } else {
       for (let i = 0; i < BAR_COUNT; i++) bars[i].target = MIN_H;
     }
+
     let x = 0;
     for (let i = 0; i < BAR_COUNT; i++) {
       bars[i].h += (bars[i].target - bars[i].h) * bars[i].speed;
@@ -518,8 +549,10 @@ HTML = """
       ctx.fill();
       x += BAR_W + BAR_GAP;
     }
+
     requestAnimationFrame(drawViz);
   }
+
   drawViz();
 
   try {
