@@ -245,7 +245,7 @@ HTML = """
     const TOTAL  = 160;
     let particles = [];
     let startedAt = null;
-    const DURATION = 2800; // ms
+    const DURATION = 5000; // ms
 
     function resize() {
       cc.width  = window.innerWidth;
@@ -263,7 +263,7 @@ HTML = """
           ? (-75 + Math.random() * 65) * Math.PI / 180
                 : (-170 + Math.random() * 65) * Math.PI / 180;
         
-        const speed = 6 + Math.random() * 10;
+        const speed = 3 + Math.random() * 10;
         particles.push({
           x,
           y: cc.height * (0.25 + Math.random() * 0.15),
