@@ -260,12 +260,13 @@ HTML = """
         const fromLeft = i < TOTAL / 2;
         const x = fromLeft ? 0 : cc.width;
         const angle = fromLeft
-          ? (-60 + Math.random() * 80) * Math.PI / 180   // 向右上方
-          : (-120 + Math.random() * 80) * Math.PI / 180; // 向左上方
+          ? (-75 + Math.random() * 65) * Math.PI / 180
+                : (-170 + Math.random() * 65) * Math.PI / 180;
+        
         const speed = 6 + Math.random() * 10;
         particles.push({
           x,
-          y: cc.height * (0.3 + Math.random() * 0.3),
+          y: cc.height * (0.25 + Math.random() * 0.15),
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
           color: COLORS[Math.floor(Math.random() * COLORS.length)],
