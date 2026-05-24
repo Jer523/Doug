@@ -27,14 +27,14 @@ html, body,
     bottom: 1.6rem;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 2px;                /* 可改大，例如 11px */
-    color: #C0B8B0;
-    letter-spacing: 2em;           /* 可改 2.5em 等 */
+    font-size: 2px !important;     /* 改成你想要的大小，带上 !important */
+    color: #C0B8B0 !important;
+    letter-spacing: 2.5em !important; /* 可自己调间距，同样加 !important */
     text-transform: uppercase;
     z-index: 10000;
     pointer-events: none;
     white-space: nowrap;
-    opacity: 0;                    /* 初始透明 */
+    opacity: 0;
     animation: footnoteFadeIn 1.2s ease-out 3.0s forwards;
 }
 
