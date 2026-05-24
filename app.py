@@ -99,7 +99,7 @@ HTML = """
   /* ── 1. Visualizer 独立容器，完全居中 ── */
   .viz-container {
     width:100%;
-    max-width:260px;
+    max-width:250px;
     margin:0 auto 10px auto;
   }
   #viz-canvas {
