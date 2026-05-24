@@ -153,7 +153,7 @@ HTML = """
     -webkit-tap-highlight-color:transparent;
     position:relative;
   }
-  #play-btn svg { width:13px; height:13px; fill:#7A6E65; }
+  #play-btn svg { width:50px; height:50px; fill:#7A6E65; }
   #play-btn .spinner {
     position:absolute;
     width:20px; height:20px;
