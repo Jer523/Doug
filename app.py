@@ -258,7 +258,7 @@ HTML = """
       particles = [];
       for (let i = 0; i < TOTAL; i++) {
         const fromLeft = i < TOTAL / 2;
-        const x = fromLeft ? 0 : cc.width;
+        const x = fromLeft ? -10 : cc.width + 10;
         const angle = fromLeft
           ? (-75 + Math.random() * 65) * Math.PI / 180
                 : (-170 + Math.random() * 65) * Math.PI / 180;
