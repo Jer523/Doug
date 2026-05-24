@@ -1,4 +1,4 @@
-import streamlit as st
+现在footnote又消失了import streamlit as st
 import streamlit.components.v1 as components
 
 st.set_page_config(
@@ -44,28 +44,25 @@ HTML = """
     font-family:'Playfair Display', Georgia, serif;
     color:#4A4A4A;
     -webkit-font-smoothing:antialiased;
-    overflow: hidden;          /* 仍可保留，防止滚动条 */
-    margin:0; padding:0;
-    display: flex;
-    flex-direction: column;    /* 纵向排列 */
-    min-height: 100vh;         /* 至少满屏 */
+    overflow:hidden;
+    position:relative;
   }
   @keyframes fadeUp {
     from { opacity:0; transform:translateY(14px); }
     to   { opacity:1; transform:translateY(0); }
   }
   .page {
-    flex: 1;                     /* 占据所有剩余空间，把 footer 推到底部 */
     display:flex;
     flex-direction:column;
     align-items:center;
     text-align:center;
-    padding:26vh 2rem 2rem 2rem; /* 底部内边距适当减小 */
+    padding:26vh 2rem 4rem 2rem;   /* 底部留出空间给 footnote */
     max-width:560px;
     margin:0 auto;
-    width:100%;
-    box
-
+    min-height:100vh;              /* 确保页面至少撑满整个视口 */
+    position:relative;             /* 让内部绝对定位的 footnote 以此为基准 */
+    box-sizing:border-box;
+  }
   .title {
     font-size:50px;
     font-weight:500;
@@ -195,16 +192,19 @@ HTML = """
     pointer-events:none;
   }
   .footnote {
-    width:100%;
+    position:absolute;
+    z-index:10000;
+    bottom:1.2rem;
+    left:50%;
+    transform:translateX(-50%);
     text-align:center;
     font-size:9px;
     color:#C0B8B0;
     letter-spacing:2em;
     text-transform:uppercase;
-    padding:1rem 0 1.6rem 0;   /* 上下间距，底部留出呼吸空间 */
     opacity:1 !important;
-    pointer-events:none;
-    flex-shrink: 0;            /* 防止被压缩 */
+    white-space:nowrap;
+    pointer-events:none;   /* 避免遮挡按钮 */
   }
 </style>
 </head>
