@@ -132,13 +132,16 @@ HTML = """
     position:relative;
   }
   #play-btn svg { width:13px; height:13px; fill:#7A6E65; }
-  #play-btn .loading-text {
+  #play-btn .spinner {
     position:absolute;
-    font-size:10px;
-    color:#9B9083;
-    white-space:nowrap;
+    width:20px; height:20px;
+    border:2px solid #DDD6CE;
+    border-top:2px solid #9B8B75;
+    border-radius:50%;
+    animation: spin 0.8s linear infinite;
     display:none;
   }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
   .progress-wrap {
     flex:1;
@@ -217,7 +220,7 @@ HTML = """
           <rect x="5" y="3" width="4" height="18"/>
           <rect x="15" y="3" width="4" height="18"/>
         </svg>
-        <span class="loading-text">加载中…</span>
+        <div class="spinner" id="loading-spinner"></div>
       </button>
       <div class="progress-wrap" id="progress-wrap">
         <div id="time-tooltip"></div>
@@ -234,17 +237,17 @@ HTML = """
 <p class="footnote">Douglas</p>
 
 <script>
-  // ========== DOM 引用 ==========
+  // ========== DOM 元素 ==========
   const playBtn      = document.getElementById('play-btn');
   const iconPlay     = document.getElementById('icon-play');
   const iconPause    = document.getElementById('icon-pause');
-  const loadingText  = document.querySelector('.loading-text');
+  const spinner      = document.getElementById('loading-spinner');
   const fill         = document.getElementById('progress-fill');
   const scrubber     = document.getElementById('scrubber');
   const progressWrap = document.getElementById('progress-wrap');
   const tooltip      = document.getElementById('time-tooltip');
 
-  // ========== 状态变量 ==========
+  // ========== 音频状态 ==========
   let audioCtx      = null;
   let audioBuffer   = null;
   let gainNode      = null;
@@ -265,7 +268,7 @@ HTML = """
   let visualBufferTimeout = null;
 
   let animationFrame = null;
-  let isLoadingAudio = false;   // 防止重复加载
+  let isLoadingAudio = false;
 
   // ========== 工具函数 ==========
   function fmt(s) {
@@ -288,69 +291,88 @@ HTML = """
     scrubber.style.left = (pct*100) + '%';
   }
 
-  function setLoadingState(loading) {
-    if (loading) {
-      iconPlay.style.display = 'none';
+  function showLoading(show) {
+    if (show) {
+      iconPlay.style.display  = 'none';
       iconPause.style.display = 'none';
-      loadingText.style.display = 'block';
-      playBtn.style.pointerEvents = 'none';   // 禁止点击
+      spinner.style.display   = 'block';
+      playBtn.style.pointerEvents = 'none';
     } else {
-      loadingText.style.display = 'none';
+      spinner.style.display = 'none';
       playBtn.style.pointerEvents = 'auto';
       if (isPlaying) {
-        iconPlay.style.display = 'none';
+        iconPlay.style.display  = 'none';
         iconPause.style.display = 'block';
       } else {
-        iconPlay.style.display = 'block';
+        iconPlay.style.display  = 'block';
         iconPause.style.display = 'none';
       }
     }
   }
 
-  // ========== 核心：下载并解码音频 ==========
+  // ========== 下载并解码音频 ==========
   async function loadAudioBuffer() {
-    if (audioBuffer) return;   // 已加载
+    if (audioBuffer) return;
     if (isLoadingAudio) return;
     isLoadingAudio = true;
-    setLoadingState(true);
+    showLoading(true);
     console.log('开始下载音频...');
-
     try {
-      // 创建 AudioContext（如果还没创建）
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         analyser = audioCtx.createAnalyser();
         analyser.fftSize = 2048;
         analyser.smoothingTimeConstant = 0.75;
         gainNode = audioCtx.createGain();
-        gainNode.gain.value = 0;   // 初始静音
+        gainNode.gain.value = 0;
         analyser.connect(gainNode);
         gainNode.connect(audioCtx.destination);
         dataArray = new Uint8Array(analyser.frequencyBinCount);
       }
-
-      // 下载
       const response = await fetch("__AUDIO_URL__");
-      if (!response.ok) {
-        throw new Error(`HTTP 错误: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
       const arrayBuffer = await response.arrayBuffer();
       console.log('下载完成，开始解码...');
-
-      // 解码
       audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
       duration = audioBuffer.duration;
-      console.log(`解码成功，时长: ${duration} 秒`);
+      console.log('解码成功，时长:', duration);
     } catch (err) {
       console.error('音频加载失败:', err);
-      alert('音频加载失败，请检查网络或CORS。详情见控制台。');
+      alert('音频加载失败，请检查网络或CORS。');
     } finally {
       isLoadingAudio = false;
-      setLoadingState(false);
+      showLoading(false);
     }
   }
 
-  // ========== 播放控制 ==========
+  // ========== 安全淡入/淡出 ==========
+  // 极短淡出 (5ms) 用于消除停止时的咔嚓
+  function fadeOutQuick() {
+    if (!gainNode) return;
+    const now = audioCtx.currentTime;
+    gainNode.gain.cancelScheduledValues(now);
+    gainNode.gain.setValueAtTime(gainNode.gain.value, now);
+    gainNode.gain.linearRampToValueAtTime(0, now + 0.005);
+  }
+
+  // 从 0 淡入到 1，时长 40ms（加强过滤）
+  function fadeInSmooth() {
+    if (!gainNode) return;
+    const now = audioCtx.currentTime;
+    gainNode.gain.cancelScheduledValues(now);
+    gainNode.gain.setValueAtTime(0, now);
+    gainNode.gain.linearRampToValueAtTime(1.0, now + 0.04);
+  }
+
+  // 立即归零（用于静音包裹）
+  function muteInstant() {
+    if (!gainNode) return;
+    const now = audioCtx.currentTime;
+    gainNode.gain.cancelScheduledValues(now);
+    gainNode.gain.setValueAtTime(0, now);
+  }
+
+  // ========== 播放核心 ==========
   function stopSource() {
     if (sourceNode) {
       try { sourceNode.stop(0); } catch(e) {}
@@ -360,60 +382,62 @@ HTML = """
   }
 
   function playFrom(offset) {
-    stopSource();
-    if (!audioBuffer || !gainNode) {
-      console.warn('音频未就绪');
-      return;
-    }
+    // 先快速淡出旧声，然后停止
+    fadeOutQuick();
+    setTimeout(() => {
+      stopSource();
+      if (!audioBuffer || !gainNode) return;
 
-    // 创建新的 source
-    sourceNode = audioCtx.createBufferSource();
-    sourceNode.buffer = audioBuffer;
-    sourceNode.connect(analyser);
+      // 创建新的 source
+      sourceNode = audioCtx.createBufferSource();
+      sourceNode.buffer = audioBuffer;
+      sourceNode.connect(analyser);
 
-    // 记录起始参数
-    startOffset = offset;
-    startTime = audioCtx.currentTime;
-    sourceNode.start(0, offset);
+      startOffset = offset;
+      startTime = audioCtx.currentTime;
+      // 确保增益归零后再启动 source
+      muteInstant();
+      sourceNode.start(0, offset);
 
-    // 安全淡入：确保从零开始
-    const now = audioCtx.currentTime;
-    gainNode.gain.cancelScheduledValues(now);
-    gainNode.gain.setValueAtTime(0, now);
-    gainNode.gain.linearRampToValueAtTime(1.0, now + 0.02);
+      // 微小延迟后开始淡入（让 source 稳定）
+      setTimeout(fadeInSmooth, 10);
 
-    isPlaying = true;
-    iconPlay.style.display = 'none';
-    iconPause.style.display = 'block';
+      isPlaying = true;
+      iconPlay.style.display  = 'none';
+      iconPause.style.display = 'block';
 
-    // 自然结束回调
-    sourceNode.onended = () => {
-      if (isPlaying && sourceNode) {
-        const elapsed = audioCtx.currentTime - startTime;
-        const endPos = startOffset + elapsed;
-        if (endPos >= duration - 0.1) {
-          stopSource();
-          isPlaying = false;
-          pausedAt = duration;
-          iconPlay.style.display = 'block';
-          iconPause.style.display = 'none';
-          updateProgress(1);
+      sourceNode.onended = () => {
+        if (isPlaying && sourceNode) {
+          const elapsed = audioCtx.currentTime - startTime;
+          const endPos = startOffset + elapsed;
+          if (endPos >= duration - 0.1) {
+            stopSource();
+            isPlaying = false;
+            pausedAt = duration;
+            iconPlay.style.display  = 'block';
+            iconPause.style.display = 'none';
+            updateProgress(1);
+          }
         }
-      }
-    };
+      };
+    }, 6); // 5ms 淡出完成后停止
   }
 
   function pause() {
     if (!isPlaying) return;
     const elapsed = audioCtx.currentTime - startTime;
     pausedAt = Math.min(startOffset + elapsed, duration);
-    stopSource();
-    isPlaying = false;
-    iconPlay.style.display = 'block';
-    iconPause.style.display = 'none';
+    // 先快速淡出，再停止 source
+    fadeOutQuick();
+    setTimeout(() => {
+      stopSource();
+      isPlaying = false;
+      iconPlay.style.display  = 'block';
+      iconPause.style.display = 'none';
+    }, 6);
   }
 
-  // ========== 进度条拖拽 ==========
+  // ========== 拖拽逻辑 ==========
   function progressPct(e) {
     const rect = progressWrap.getBoundingClientRect();
     const x = e.touches ? e.touches[0].clientX : e.clientX;
@@ -431,7 +455,7 @@ HTML = """
     draggingProgress = true;
     lastDragPct = progressPct(e);
     updateProgress(lastDragPct);
-    fill.style.transition = 'none';
+    fill.style.transition    = 'none';
     scrubber.style.transition = 'none';
     visualBufferActive = true;
     clearTimeout(visualBufferTimeout);
@@ -441,7 +465,7 @@ HTML = """
   function dragEnd() {
     if (!draggingProgress) return;
     draggingProgress = false;
-    fill.style.transition = 'width 0.15s ease-out';
+    fill.style.transition    = 'width 0.15s ease-out';
     scrubber.style.transition = 'left 0.15s ease-out';
 
     if (lastDragPct !== null && duration) {
@@ -471,25 +495,22 @@ HTML = """
 
   // ========== 播放/暂停按钮 ==========
   playBtn.addEventListener('click', async () => {
-    // 首次点击加载音频
     if (!audioBuffer) {
       await loadAudioBuffer();
-      if (!audioBuffer) return;   // 加载失败则退出
+      if (!audioBuffer) return;
     }
-
     if (audioCtx.state === 'suspended') {
       await audioCtx.resume();
     }
-
     if (isPlaying) {
       pause();
     } else {
-      if (pausedAt >= duration) pausedAt = 0;   // 播完从头开始
+      if (pausedAt >= duration) pausedAt = 0;
       playFrom(pausedAt);
     }
   });
 
-  // ========== 进度条自动更新 (requestAnimationFrame) ==========
+  // ========== 进度条自动更新 ==========
   function updateTimeDisplay() {
     if (!draggingProgress && !visualBufferActive && isPlaying) {
       const elapsed = audioCtx.currentTime - startTime;
@@ -504,7 +525,7 @@ HTML = """
   }
   updateTimeDisplay();
 
-  // ========== 可视化 ==========
+  // ========== 可视化（保持不变） ==========
   const canvas = document.getElementById('viz-canvas');
   const ctx    = canvas.getContext('2d');
   const BAR_COUNT = 44;
@@ -521,7 +542,7 @@ HTML = """
     const freqMax = 2600;
     barBins = new Array(BAR_COUNT);
     for (let i = 0; i < BAR_COUNT; i++) {
-      const t    = i / (BAR_COUNT - 1);
+      const t = i / (BAR_COUNT - 1);
       const freq = freqMin * Math.pow(freqMax / freqMin, t);
       barBins[i] = Math.min(Math.round(freq / hzPerBin), totalBins - 1);
     }
@@ -552,8 +573,8 @@ HTML = """
   let tickCount = 0;
   function drawViz() {
     const dpr = window.devicePixelRatio || 1;
-    const W   = canvas.width  / dpr;
-    const H   = canvas.height / dpr;
+    const W = canvas.width / dpr;
+    const H = canvas.height / dpr;
     ctx.clearRect(0, 0, W, H);
     const BAR_W = (W - (BAR_COUNT - 1) * BAR_GAP) / BAR_COUNT;
     const playing = isPlaying;
@@ -603,7 +624,7 @@ HTML = """
     if (audioCtx) audioCtx.close();
   });
 
-  // 适配 iframe 全屏（Streamlit 内）
+  // Streamlit 全屏 iframe
   try {
     window.parent.document.querySelectorAll('iframe').forEach(f => {
       f.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:'+window.screen.height+'px;border:none;z-index:99999;';
