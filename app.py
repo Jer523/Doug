@@ -96,7 +96,7 @@ HTML = """
     color:#6A6A6A;
     letter-spacing:0.02em;
     line-height:1.6;
-    margin-bottom:2.5rem;
+    margin-bottom:2.4rem;
     animation:fadeUp 1.6s ease-out 2s both;
   }
   .player-block {
@@ -153,7 +153,7 @@ HTML = """
     -webkit-tap-highlight-color:transparent;
     position:relative;
   }
-  #play-btn svg { width:14px; height:14px; fill:#7A6E65; }
+  #play-btn svg { width:13px; height:13px; fill:#7A6E65; }
   #play-btn .spinner {
     position:absolute;
     width:20px; height:20px;
