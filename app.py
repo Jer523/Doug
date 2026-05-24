@@ -96,7 +96,7 @@ HTML = """
     color:#6A6A6A;
     letter-spacing:0.02em;
     line-height:1.6;
-    margin-bottom:2.4rem;
+    margin-bottom:2.2rem;
     animation:fadeUp 1.6s ease-out 2s both;
   }
   .player-block {
@@ -600,7 +600,7 @@ HTML = """
   // ========== 可视化 ==========
   const canvas = document.getElementById('viz-canvas');
   const ctx    = canvas.getContext('2d');
-  const BAR_COUNT = 32;
+  const BAR_COUNT = 36;
   const BAR_GAP   = 2;
   const MAX_H     = 24;
   const MIN_H     = 2;
