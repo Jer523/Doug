@@ -402,7 +402,7 @@ HTML = """
             eqGain = 1.0;
           } else {
             // 高频段: 1.0 → 2.8，快速拉升
-            eqGain = 1.0 + Math.pow((t - 0.65) / 0.35, 1.5) * 0.7;
+            eqGain = 1.0 + Math.pow((t - 0.65) / 0.35, 1.5) * 0.2;
           }
 
           const boosted  = Math.min(1, raw * eqGain);
