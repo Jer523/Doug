@@ -45,6 +45,7 @@ HTML = """
     color:#4A4A4A;
     -webkit-font-smoothing:antialiased;
     overflow:hidden;
+    position:relative;
   }
   @keyframes fadeUp {
     from { opacity:0; transform:translateY(14px); }
@@ -237,10 +238,11 @@ HTML = """
         </div>
       </div>
     </div>
-  <p class="footnote">Douglas</p>
+
   </div>
 </div>
 
+<p class="footnote">Douglas</p>
 <canvas id="confetti-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;"></canvas>
 <script>
   // ========== 纸屑炮 ==========
