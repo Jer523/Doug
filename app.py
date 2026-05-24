@@ -239,7 +239,8 @@ HTML = """
   const tooltip      = document.getElementById('time-tooltip');
 
   let tooltipTimer     = null;
-  let draggingProgress = false;
+    let draggingProgress = false;
+    let isSeeking        = false;
 
   // ── Web Audio ──
   let audioCtx  = null;
@@ -288,8 +289,8 @@ HTML = """
   audio.addEventListener('play',  () => { iconPlay.style.display='none';  iconPause.style.display='block'; });
   audio.addEventListener('pause', () => { iconPlay.style.display='block'; iconPause.style.display='none';  });
   audio.addEventListener('ended', () => { iconPlay.style.display='block'; iconPause.style.display='none'; updateProgress(0); });
-    audio.addEventListener('timeupdate', () => {
-    if (!draggingProgress && audio.duration)
+      audio.addEventListener('timeupdate', () => {
+    if (!draggingProgress && !isSeeking && audio.duration)
       updateProgress(audio.currentTime / audio.duration);
   });
 
@@ -306,11 +307,13 @@ HTML = """
     updateProgress(pendingPct);
     showTooltip(pendingPct, pendingPct * (audio.duration || 0));
   }
-  function dragEnd() {
+    function dragEnd() {
     if (!draggingProgress) return;
     draggingProgress = false;
     if (pendingPct !== null && audio.duration) {
       audio.currentTime = pendingPct * audio.duration;
+      isSeeking = true;
+      setTimeout(() => { isSeeking = false; }, 300);
       pendingPct = null;
     }
   }
@@ -331,7 +334,7 @@ HTML = """
   const MIN_H     = 2;
 
   const FREQ_MIN = 40;
-  const FREQ_MAX = 6000;
+  const FREQ_MAX = 4500;
 
   // barBins[i] = which FFT bin index bar i reads from
   // Built once after audioCtx is ready (we need sampleRate)
@@ -405,7 +408,7 @@ HTML = """
 
           // 3. EQ gain
           const t      = i / (BAR_COUNT - 1);
-          const eqGain = 0.7 + t * 10;
+          const eqGain = 1.0 + Math.pow(t, 4) * 20;
           const boosted = Math.min(1, raw * eqGain);
 
           bars[i].target = MIN_H + boosted * (MAX_H - MIN_H);
