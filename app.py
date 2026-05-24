@@ -25,7 +25,7 @@ html, body,
 .footnote-streamlit {
     position: fixed;
     bottom: 0rem;
-    left: calc(50% + 12px);
+    left: calc(50% + 8px);
     transform: translateX(-50%);
     font-size: 7.5px !important;
     color: #C0B8B0 !important;
