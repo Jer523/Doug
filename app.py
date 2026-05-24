@@ -8,6 +8,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+# 全局背景样式
 st.markdown("""
 <style>
 html, body,
@@ -19,6 +20,20 @@ html, body,
     padding: 0 !important;
     margin: 0 !important;
     overflow: hidden !important;
+}
+/* 脚注样式 */
+.footnote-streamlit {
+    position: fixed;
+    bottom: 1.6rem;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 9px;
+    color: #C0B8B0;
+    letter-spacing: 2em;
+    text-transform: uppercase;
+    z-index: 10000;
+    pointer-events: none;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -187,8 +202,6 @@ HTML = """
     transition:opacity 0.2s;
     pointer-events:none;
   }
-
-  /* 不在这里定义 .footnote，完全由 JS 控制 */
 </style>
 </head>
 <body>
@@ -225,7 +238,7 @@ HTML = """
   </div>
 </div>
 
-<p class="footnote">Douglas</p>
+<!-- 纸屑 canvas (保留) -->
 <canvas id="confetti-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;"></canvas>
 
 <script>
@@ -670,55 +683,18 @@ HTML = """
   }
   drawViz();
 
-  // ========== 强制显示 footnote ==========
-  (function fixFootnote() {
-    const fn = document.querySelector('.footnote');
-    if (!fn) return;
-    Object.assign(fn.style, {
-      position: 'fixed',
-      bottom: '1.6rem',
-      left: '50%',
-      transform: 'translateX(-50%)',
-      zIndex: '99999',
-      opacity: '1',
-      color: '#C0B8B0',
-      fontSize: '9px',
-      letterSpacing: '2em',
-      textTransform: 'uppercase',
-      pointerEvents: 'none',
-      whiteSpace: 'nowrap',
-      margin: '0',
-      padding: '0',
-      background: 'transparent',
-      border: 'none',
-      display: 'block',
-      visibility: 'visible',
-    });
-    document.body.style.minHeight = '100vh';
-    document.body.style.position = 'relative';
-    try {
-      const iframe = window.frameElement;
-      if (iframe) {
-        iframe.style.height = window.innerHeight + 'px';
-      }
-    } catch(e) {}
-  })();
-
   // 清理
   window.addEventListener('beforeunload', () => {
     stopSource();
     if (audioCtx) audioCtx.close();
   });
-
-  // Streamlit 全屏 iframe 调整
-  try {
-    window.parent.document.querySelectorAll('iframe').forEach(f => {
-      f.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:'+window.screen.height+'px;border:none;z-index:99999;';
-    });
-  } catch(e) {}
 </script>
 </body>
 </html>
 """
 
+# 渲染播放器组件
 components.html(HTML.replace("__AUDIO_URL__", AUDIO_URL), height=900, scrolling=False)
+
+# 脚注直接用 Streamlit 的 markdown 放在页面底部（固定定位）
+st.markdown('<p class="footnote-streamlit">Douglas</p>', unsafe_allow_html=True)
