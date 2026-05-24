@@ -168,7 +168,7 @@ HTML = """
   .progress-wrap {
     flex:1;
     position:relative;
-    height:44px;
+    height:32px;
     display:flex;
     align-items:center;
     cursor:pointer;
