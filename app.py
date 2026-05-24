@@ -98,7 +98,7 @@ HTML = """
 
   .viz-container {
     width:100%;
-    max-width:250px;
+    max-width:230px;
     margin:0 auto 10px auto;
   }
   #viz-canvas {
@@ -109,7 +109,7 @@ HTML = """
 
   .player-container {
     width:100%;
-    max-width:270px;
+    max-width:250px;
     margin:0 auto;
     display:flex;
     align-items:center;
@@ -406,7 +406,8 @@ HTML = """
             }
 
           const boosted  = Math.min(1, raw * eqGain);
-          bars[i].target = MIN_H + boosted * (MAX_H - MIN_H);
+          const barMax = t < 0.65 ? MAX_H : MAX_H - Math.pow((t - 0.65) / 0.35, 0.7) * 16;
+          bars[i].target = MIN_H + boosted * (barMax - MIN_H);
         }
       } else {
         tickCount++;
