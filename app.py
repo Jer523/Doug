@@ -236,7 +236,7 @@ HTML = """
 
 <p class="footnote">Douglas</p>
 <canvas id="confetti-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;"></canvas>
-
+<script>
   // ========== 纸屑炮 ==========
   (function() {
     const cc     = document.getElementById('confetti-canvas');
@@ -310,6 +310,7 @@ HTML = """
       requestAnimationFrame(tick);
     }, 500);
   })();
+</script>
 
 <script>
   // ========== DOM 元素 ==========
