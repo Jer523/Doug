@@ -246,6 +246,7 @@ HTML = """
 
   let audioCtx  = null;
   let analyser  = null;
+  let gainNode  = null;
   let dataArray = null;
 
   function initWebAudio() {
@@ -255,20 +256,39 @@ HTML = """
       analyser = audioCtx.createAnalyser();
       analyser.fftSize = 2048;
       analyser.smoothingTimeConstant = 0.75;
+      gainNode = audioCtx.createGain();
+      gainNode.gain.value = 1.0;
       const source = audioCtx.createMediaElementSource(audio);
       source.connect(analyser);
-      analyser.connect(audioCtx.destination);
+      analyser.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
       dataArray = new Uint8Array(analyser.frequencyBinCount);
     } catch(e) {
       console.warn('Web Audio unavailable:', e);
     }
   }
 
+  // 淡出20ms → 执行操作 → 淡入20ms，消除咔哒声
+  function fadeAndDo(action) {
+    if (!gainNode) { action(); return; }
+    const g   = gainNode.gain;
+    const now = audioCtx.currentTime;
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(g.value, now);
+    g.linearRampToValueAtTime(0, now + 0.02);
+    setTimeout(() => {
+      action();
+      const t = audioCtx.currentTime;
+      g.setValueAtTime(0, t);
+      g.linearRampToValueAtTime(1.0, t + 0.02);
+    }, 25);
+  }
+
   function fmt(s) {
     if (!isFinite(s) || isNaN(s) || s < 0) return '';
     return Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0');
   }
-  
+
   function showTooltip(pct, t) {
     const label = fmt(t);
     if (!label) return;
@@ -278,126 +298,90 @@ HTML = """
     clearTimeout(tooltipTimer);
     tooltipTimer = setTimeout(() => tooltip.style.opacity='0', 1500);
   }
-  
+
   function updateProgress(pct) {
     fill.style.width    = (pct*100) + '%';
     scrubber.style.left = (pct*100) + '%';
   }
 
-  // ==================== CRITICAL FIX: Seeking Event Handlers ====================
-  
   audio.addEventListener('seeking', () => {
     isSeeking = true;
   });
 
   audio.addEventListener('seeked', () => {
-    // Activate visual buffer to prevent timeupdate from causing jumps
     visualBufferActive = true;
     clearTimeout(visualBufferTimeout);
-    
-    // Keep the UI at the dragged position for a brief period
     if (lastDragPct !== null && audio.duration) {
       updateProgress(lastDragPct);
     }
-    
-    // Release the visual buffer after 150ms - enough to hide keyframe alignment jumps
     visualBufferTimeout = setTimeout(() => {
       visualBufferActive = false;
       isSeeking = false;
-      // Sync to actual position after buffer expires
       if (!draggingProgress && audio.duration) {
         updateProgress(audio.currentTime / audio.duration);
       }
     }, 150);
   });
 
-  // ==================== Critical Timeupdate Handler ====================
-  
   audio.addEventListener('timeupdate', () => {
-    // Only update if we're not in any special state
     if (!draggingProgress && !isSeeking && !visualBufferActive && audio.duration) {
       updateProgress(audio.currentTime / audio.duration);
     }
   });
 
-  // ==================== Drag Handlers ====================
-  
   function progressPct(e) {
     const rect = progressWrap.getBoundingClientRect();
     const x = e.touches ? e.touches[0].clientX : e.clientX;
     return Math.max(0, Math.min(1, (x - rect.left) / rect.width));
   }
-  
+
   function dragMove(e) {
     if (!draggingProgress) return;
     lastDragPct = progressPct(e);
     updateProgress(lastDragPct);
     showTooltip(lastDragPct, lastDragPct * (audio.duration || 0));
   }
-  
+
   function dragStart(e) {
     draggingProgress = true;
     lastDragPct = progressPct(e);
     updateProgress(lastDragPct);
-    
-    // Remove CSS transitions during drag for immediate response
-    fill.style.transition = 'none';
+    fill.style.transition    = 'none';
     scrubber.style.transition = 'none';
-    
     e.preventDefault();
   }
-  
+
   function dragEnd() {
     if (!draggingProgress) return;
     draggingProgress = false;
-    
-    // Restore CSS transitions for smooth settling
-    fill.style.transition = 'width 0.15s ease-out';
+    fill.style.transition    = 'width 0.15s ease-out';
     scrubber.style.transition = 'left 0.15s ease-out';
-    
     if (lastDragPct !== null && audio.duration) {
       const targetTime = lastDragPct * audio.duration;
-      audio.currentTime = targetTime;
-      // isSeeking will be set by the 'seeking' event
-      // visualBufferActive will be set by the 'seeked' event
-      lastDragPct = null;
+      fadeAndDo(() => { audio.currentTime = targetTime; });
     }
   }
 
-  // Event listeners for dragging
-  progressWrap.addEventListener('mousedown', dragStart);
+  progressWrap.addEventListener('mousedown',  dragStart);
   progressWrap.addEventListener('touchstart', dragStart, {passive: false});
-  window.addEventListener('mousemove', dragMove);
-  window.addEventListener('touchmove', dragMove, {passive: false});
-  window.addEventListener('mouseup', dragEnd);
-  window.addEventListener('touchend', dragEnd);
+  window.addEventListener('mousemove',  dragMove);
+  window.addEventListener('touchmove',  dragMove, {passive: false});
+  window.addEventListener('mouseup',    dragEnd);
+  window.addEventListener('touchend',   dragEnd);
 
-  // ==================== Play/Pause ====================
-  
   document.getElementById('play-btn').addEventListener('click', () => {
     initWebAudio();
     if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-    audio.paused ? audio.play().catch(()=>{}) : audio.pause();
-  });
-  
-  audio.addEventListener('play',  () => { 
-    iconPlay.style.display='none';  
-    iconPause.style.display='block'; 
-  });
-  
-  audio.addEventListener('pause', () => { 
-    iconPlay.style.display='block'; 
-    iconPause.style.display='none';  
-  });
-  
-  audio.addEventListener('ended', () => { 
-    iconPlay.style.display='block'; 
-    iconPause.style.display='none'; 
-    updateProgress(0); 
+    fadeAndDo(() => {
+      audio.paused ? audio.play().catch(()=>{}) : audio.pause();
+    });
   });
 
-  // ==================== Visualizer (unchanged) ====================
-  
+  audio.addEventListener('play',  () => { iconPlay.style.display='none';  iconPause.style.display='block'; });
+  audio.addEventListener('pause', () => { iconPlay.style.display='block'; iconPause.style.display='none';  });
+  audio.addEventListener('ended', () => { iconPlay.style.display='block'; iconPause.style.display='none'; updateProgress(0); });
+
+  // ── Visualizer ──
   const canvas = document.getElementById('viz-canvas');
   const ctx    = canvas.getContext('2d');
 
@@ -412,10 +396,8 @@ HTML = """
     const sampleRate = audioCtx.sampleRate;
     const totalBins  = analyser.frequencyBinCount;
     const hzPerBin   = sampleRate / analyser.fftSize;
-
     const freqMin = 60;
     const freqMax = 2600;
-
     barBins = new Array(BAR_COUNT);
     for (let i = 0; i < BAR_COUNT; i++) {
       const t    = i / (BAR_COUNT - 1);
@@ -461,21 +443,19 @@ HTML = """
       if (analyser && dataArray) {
         if (!barBins) buildBarBins();
         analyser.getByteFrequencyData(dataArray);
-
         for (let i = 0; i < BAR_COUNT; i++) {
           const raw = dataArray[barBins[i]] / 255;
           const t = i / (BAR_COUNT - 1);
           let eqGain;
           if (t < 0.07) {
-                eqGain = 0.1;
-            } else if (t < 0.65) {
-                eqGain = 0.1 + Math.pow((t - 0.07) / 0.58, 0.8) * 1.4;
-            } else {
-                eqGain = 1.0 + Math.pow((t - 0.65) / 0.35, 1.0) * 5.0;
-            }
-
-          const boosted  = Math.min(1, raw * eqGain);
-          const barMax = t < 0.65 ? MAX_H : MAX_H - Math.pow((t - 0.65) / 0.35, 0.7) * 16;
+            eqGain = 0.1;
+          } else if (t < 0.65) {
+            eqGain = 0.1 + Math.pow((t - 0.07) / 0.58, 0.8) * 1.4;
+          } else {
+            eqGain = 1.0 + Math.pow((t - 0.65) / 0.35, 1.0) * 5.0;
+          }
+          const boosted = Math.min(1, raw * eqGain);
+          const barMax  = t < 0.65 ? MAX_H : MAX_H - Math.pow((t - 0.65) / 0.35, 0.7) * 16;
           bars[i].target = MIN_H + boosted * (barMax - MIN_H);
         }
       } else {
