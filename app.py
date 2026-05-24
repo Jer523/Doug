@@ -28,7 +28,7 @@ html, body,
     bottom: 1.6rem;
     left: calc(50% + 9px);
     transform: translateX(-50%);
-    font-size: 7.5px !important;
+    font-size: 8px !important;
     color: #C0B8B0 !important;
     letter-spacing: 2.5em !important; /* 可自己调间距，同样加 !important */
     text-transform: uppercase;
