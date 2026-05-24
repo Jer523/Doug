@@ -83,7 +83,7 @@ HTML = """
     animation:fadeUp 1.4s ease-out 2.5s both;
   }
   .divider {
-    width:260px;
+    width:173px;
     height:1px;
     background:#C8BFB0;
     margin:0 auto 2rem auto;
@@ -99,7 +99,7 @@ HTML = """
   /* ── 1. Visualizer 独立容器，完全居中 ── */
   .viz-container {
     width:100%;
-    max-width:270px;
+    max-width:260px;
     margin:0 auto 10px auto;
   }
   #viz-canvas {
@@ -322,7 +322,7 @@ HTML = """
   const MIN_H     = 2;
 
   const FREQ_MIN = 40;
-  const FREQ_MAX = 9000;
+  const FREQ_MAX = 6000;
 
   // barBins[i] = which FFT bin index bar i reads from
   // Built once after audioCtx is ready (we need sampleRate)
@@ -342,15 +342,11 @@ HTML = """
 
     // 2. Log-scale mapping from FREQ_MIN..FREQ_MAX → bars 0..BAR_COUNT-1
     //    Then remap those bins to 0..maxBin (i.e., fill the full width)
-    const logMin = Math.log10(FREQ_MIN);
-    const logMax = Math.log10(FREQ_MAX);
-
-    barBins = [];
+        barBins = [];
     for (let i = 0; i < BAR_COUNT; i++) {
-      const t   = i / (BAR_COUNT - 1);                          // 0=left/low, 1=right/high
-      const hz  = Math.pow(10, logMin + t * (logMax - logMin)); // log-spaced Hz
-      // Map hz directly to bin — this already remaps to 0..maxBin
-      // because hz stays within FREQ_MIN..FREQ_MAX
+      // 指数映射：低频区占更多格子，高频区压缩
+      const t   = Math.pow(i / (BAR_COUNT - 1), 1.6);
+      const hz  = FREQ_MIN + t * (6000 - FREQ_MIN);
       const bin = Math.round(hz / hzPerBin);
       barBins.push(Math.min(bin, maxBin));
     }
