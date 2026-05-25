@@ -260,7 +260,7 @@ HTML = """
   background:#FDFBF7;z-index:99997;
   display:flex;flex-direction:column;
   align-items:center;justify-content:center;
-  padding-bottom:24vh;
+  padding-bottom:18vh;
   transition:opacity 0.7s ease-out;
 ">
   <p style="
