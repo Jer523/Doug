@@ -35,6 +35,8 @@ if not st.session_state.auth:
         box-shadow: none !important;
     }
     div[data-testid="stTextInput"] { max-width: 120px; margin: 0 auto; }
+    div[data-testid="stTextInput"] button { display: none !important; }
+    div[data-testid="stTextInput"] > div { border: none !important; box-shadow: none !important; }
     </style>
     """, unsafe_allow_html=True)
 
