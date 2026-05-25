@@ -40,9 +40,21 @@ if not st.session_state.auth:
     </style>
     """, unsafe_allow_html=True)
 
+    st.markdown("<div style='height:35vh'></div>", unsafe_allow_html=True)
+    
     col1, col2, col3 = st.columns([2, 1, 2])
     with col2:
-        st.markdown("<div style='height:40vh'></div>", unsafe_allow_html=True)
+        st.markdown("""
+        <p style='
+            font-family: Playfair Display, Georgia, serif;
+            font-size: 11px;
+            font-style: italic;
+            color: #9B9083;
+            letter-spacing: 0.08em;
+            text-align: center;
+            margin-bottom: 1rem;
+        '>please enter your code</p>
+        """, unsafe_allow_html=True)
         pwd = st.text_input("", type="password", placeholder="", label_visibility="collapsed")
         if pwd == "719":
             st.session_state.auth = True
