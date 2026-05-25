@@ -8,80 +8,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# ── 密码门 ──
-if "auth" not in st.session_state:
-    st.session_state.auth = False
-if "fading" not in st.session_state:
-    st.session_state.fading = False
-
-if not st.session_state.auth:
-    
-    if st.session_state.fading:
-        st.markdown("""
-        <style>
-        [data-testid="stAppViewContainer"] {
-            animation: authFadeOut 0.5s ease-out forwards !important;
-        }
-        @keyframes authFadeOut { from { opacity:1; } to { opacity:0; } }
-        </style>
-        """, unsafe_allow_html=True)
-        import time
-        time.sleep(0.6)
-        st.session_state.auth  = True
-        st.session_state.fading = False
-        st.rerun()
-        
-    st.markdown("""
-    <style>
-    [data-testid="stAppViewContainer"] { background: #FDFBF7 !important; }
-    div[data-testid="stTextInput"] input {
-        background: transparent;
-        border: none;
-        border-bottom: 1px solid #C8BFB0;
-        border-radius: 0;
-        color: #4A4A4A;
-        font-family: 'Playfair Display', Georgia, serif;
-        font-size: 15px;
-        letter-spacing: 0.3em;
-        text-align: center;
-        box-shadow: none !important;
-        padding: 8px 0;
-    }
-    div[data-testid="stTextInput"] input:focus {
-        border-bottom: 1px solid #9B8B75;
-        outline: none;
-        box-shadow: none !important;
-    }
-    div[data-testid="stTextInput"] { max-width: 120px; margin: 0 auto; }
-    div[data-testid="stTextInput"] button { display: none !important; }
-    div[data-testid="stTextInput"] > div { border: none !important; box-shadow: none !important; }
-    </style>
-    """, unsafe_allow_html=True)
-
-    st.markdown("<div style='height:26vh'></div>", unsafe_allow_html=True)
-    
-    col1, col2, col3 = st.columns([2, 1, 2])
-    with col2:
-        st.markdown("""
-        <p style='
-            font-family: Playfair Display, Georgia, serif;
-            font-size: 11px;
-            font-style: italic;
-            color: #9B9083;
-            letter-spacing: 0.08em;
-            text-align: center;
-            margin-bottom: 1rem;
-        '>please enter your code</p>
-        """, unsafe_allow_html=True)
-        pwd = st.text_input("", type="default", placeholder="", label_visibility="collapsed")
-        if pwd == "719":
-            st.session_state.fading = True
-            st.rerun()
-        elif pwd:
-            st.stop()
-        else:
-            st.stop()
-
 # 全局背景样式
 st.markdown("""
 <style>
@@ -95,7 +21,6 @@ html, body,
     margin: 0 !important;
     overflow: hidden !important;
 }
-/* 脚注样式：延迟淡入、居中、可调大小字间距 */
 .footnote-streamlit {
     position: fixed;
     font-family: 'Playfair Display', Georgia, serif;
@@ -104,7 +29,7 @@ html, body,
     transform: translateX(-50%);
     font-size: 8px !important;
     color: #C0B8B0 !important;
-    letter-spacing: 2.5em !important; /* 可自己调间距，同样加 !important */
+    letter-spacing: 2.5em !important;
     text-transform: uppercase;
     z-index: 10000;
     pointer-events: none;
@@ -112,7 +37,6 @@ html, body,
     opacity: 0;
     animation: footnoteFadeIn 1.2s ease-out 3.0s forwards;
 }
-
 @keyframes footnoteFadeIn {
     from { opacity: 0; }
     to   { opacity: 1; }
@@ -164,6 +88,7 @@ HTML = """
     line-height:1.1;
     margin-bottom:1rem;
     animation:fadeUp 1.6s ease-out 0.5s both;
+    animation-play-state: paused;
   }
   .subtitle {
     font-size:15.6px;
@@ -173,11 +98,13 @@ HTML = """
     line-height:1.6;
     margin-bottom:2.2rem;
     animation:fadeUp 1.6s ease-out 2s both;
+    animation-play-state: paused;
   }
   .player-block {
     width:100%;
     max-width:420px;
     animation:fadeUp 1.4s ease-out 2.5s both;
+    animation-play-state: paused;
   }
   .divider {
     width:257px;
@@ -192,7 +119,6 @@ HTML = """
     margin-bottom:1.2rem;
     line-height:1.6;
   }
-
   .viz-container {
     width:100%;
     max-width:240px;
@@ -203,7 +129,6 @@ HTML = """
     width:100%;
     height:28px;
   }
-
   .player-container {
     width:100%;
     max-width:250px;
@@ -213,7 +138,6 @@ HTML = """
     gap:14px;
     padding-right:5px;
   }
-
   #play-btn {
     flex-shrink:0;
     width:36px; height:36px;
@@ -239,7 +163,6 @@ HTML = """
     display:none;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
-
   .progress-wrap {
     flex:1;
     position:relative;
@@ -294,11 +217,9 @@ HTML = """
   <div class="player-block">
     <div class="divider"></div>
     <p class="track">Brahms: Intermezzo Op. 118, No. 2 (1893)</p>
-
     <div class="viz-container">
       <canvas id="viz-canvas"></canvas>
     </div>
-
     <div class="player-container">
       <button id="play-btn">
         <svg id="icon-play" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
@@ -316,12 +237,36 @@ HTML = """
         </div>
       </div>
     </div>
-
   </div>
 </div>
 
-<!-- 纸屑 canvas (保留) -->
 <canvas id="confetti-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;"></canvas>
+
+<!-- 密码遮罩 -->
+<div id="auth-overlay" style="
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:#FDFBF7;z-index:99997;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  transition:opacity 0.7s ease-out;
+">
+  <p style="
+    font-family:'Playfair Display',Georgia,serif;
+    font-size:11px;font-style:italic;
+    color:#9B9083;letter-spacing:0.08em;
+    margin-bottom:1.2rem;
+  ">please enter your code</p>
+  <input id="auth-input" type="tel" inputmode="numeric" style="
+    background:transparent;
+    border:none;
+    border-bottom:1px solid #C8BFB0;
+    font-family:'Playfair Display',Georgia,serif;
+    font-size:15px;letter-spacing:0.3em;
+    text-align:center;color:#4A4A4A;
+    width:80px;outline:none;padding:8px 0;
+    -webkit-appearance:none;
+  " autocomplete="off" />
+</div>
 
 <script>
   // ========== 纸屑炮 ==========
@@ -391,10 +336,33 @@ HTML = """
       requestAnimationFrame(tick);
     }
 
-    setTimeout(() => {
+    window.startConfetti = function() {
       spawn();
       requestAnimationFrame(tick);
-    }, 500);
+    };
+  })();
+</script>
+
+<script>
+  // ========== 密码遮罩逻辑 ==========
+  (function() {
+    const overlay = document.getElementById('auth-overlay');
+    const input   = document.getElementById('auth-input');
+    setTimeout(() => input.focus(), 100);
+    input.addEventListener('input', function() {
+      if (this.value === '719') {
+        overlay.style.opacity = '0';
+        setTimeout(() => {
+          overlay.remove();
+          document.querySelectorAll('.title, .subtitle, .player-block').forEach(el => {
+            el.style.animationPlayState = 'running';
+          });
+          if (window.startConfetti) window.startConfetti();
+        }, 750);
+      } else if (this.value.length >= 3) {
+        this.value = '';
+      }
+    });
   })();
 </script>
 
@@ -478,7 +446,6 @@ HTML = """
     if (isLoadingAudio) return;
     isLoadingAudio = true;
     showLoading(true);
-    console.log('开始下载音频...');
     try {
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -494,10 +461,8 @@ HTML = """
       const response = await fetch("__AUDIO_URL__");
       if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
       const arrayBuffer = await response.arrayBuffer();
-      console.log('下载完成，开始解码...');
       audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
       duration = audioBuffer.duration;
-      console.log('解码成功，时长:', duration);
     } catch (err) {
       console.error('音频加载失败:', err);
       alert('音频加载失败，请检查网络或CORS。');
@@ -765,7 +730,6 @@ HTML = """
   }
   drawViz();
 
-  // 清理
   window.addEventListener('beforeunload', () => {
     stopSource();
     if (audioCtx) audioCtx.close();
@@ -775,8 +739,6 @@ HTML = """
 </html>
 """
 
-# 渲染播放器组件
 components.html(HTML.replace("__AUDIO_URL__", AUDIO_URL), height=900, scrolling=False)
 
-# 脚注直接用 Streamlit 的 markdown 放在页面底部（固定定位）
 st.markdown('<p class="footnote-streamlit">Douglas</p>', unsafe_allow_html=True)
