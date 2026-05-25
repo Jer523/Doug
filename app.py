@@ -8,7 +8,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# 全局背景样式
 st.markdown("""
 <style>
 html, body,
@@ -20,26 +19,6 @@ html, body,
     padding: 0 !important;
     margin: 0 !important;
     overflow: hidden !important;
-}
-.footnote-streamlit {
-    position: fixed;
-    font-family: 'Playfair Display', Georgia, serif;
-    bottom: 1.6rem;
-    left: calc(50% + 9px);
-    transform: translateX(-50%);
-    font-size: 8px !important;
-    color: #C0B8B0 !important;
-    letter-spacing: 2.5em !important;
-    text-transform: uppercase;
-    z-index: 10000;
-    pointer-events: none;
-    white-space: nowrap;
-    opacity: 0;
-    animation: footnoteFadeIn 1.2s ease-out 3.0s forwards;
-}
-@keyframes footnoteFadeIn {
-    from { opacity: 0; }
-    to   { opacity: 1; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -70,6 +49,10 @@ HTML = """
   @keyframes fadeUp {
     from { opacity:0; transform:translateY(14px); }
     to   { opacity:1; transform:translateY(0); }
+  }
+  @keyframes footnoteFadeIn {
+    from { opacity:0; }
+    to   { opacity:1; }
   }
   .page {
     display:flex;
@@ -207,6 +190,26 @@ HTML = """
     transition:opacity 0.2s;
     pointer-events:none;
   }
+
+  /* footnote：默认隐藏，解锁后才触发动画 */
+  #footnote {
+    position:fixed;
+    font-family:'Playfair Display', Georgia, serif;
+    bottom:1.6rem;
+    left:calc(50% + 9px);
+    transform:translateX(-50%);
+    font-size:8px;
+    color:#C0B8B0;
+    letter-spacing:2.5em;
+    text-transform:uppercase;
+    z-index:10000;
+    pointer-events:none;
+    white-space:nowrap;
+    opacity:0;
+  }
+  #footnote.active {
+    animation: footnoteFadeIn 1.2s ease-out 3.0s forwards;
+  }
 </style>
 </head>
 <body>
@@ -240,14 +243,18 @@ HTML = """
   </div>
 </div>
 
+<!-- footnote 在这里，JS 解锁后加 class 触发动画 -->
+<p id="footnote">Douglas</p>
+
 <canvas id="confetti-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;"></canvas>
 
-<!-- 密码遮罩 -->
+<!-- 密码遮罩：padding-bottom 把内容往上推 -->
 <div id="auth-overlay" style="
   position:fixed;top:0;left:0;width:100%;height:100%;
   background:#FDFBF7;z-index:99997;
   display:flex;flex-direction:column;
   align-items:center;justify-content:center;
+  padding-bottom:30vh;
   transition:opacity 0.7s ease-out;
 ">
   <p style="
@@ -269,7 +276,6 @@ HTML = """
 </div>
 
 <script>
-  // ========== 纸屑炮 ==========
   (function() {
     const cc     = document.getElementById('confetti-canvas');
     const cx     = cc.getContext('2d');
@@ -344,19 +350,22 @@ HTML = """
 </script>
 
 <script>
-  // ========== 密码遮罩逻辑 ==========
   (function() {
-    const overlay = document.getElementById('auth-overlay');
-    const input   = document.getElementById('auth-input');
+    const overlay  = document.getElementById('auth-overlay');
+    const input    = document.getElementById('auth-input');
+    const footnote = document.getElementById('footnote');
     setTimeout(() => input.focus(), 100);
     input.addEventListener('input', function() {
       if (this.value === '719') {
         overlay.style.opacity = '0';
         setTimeout(() => {
           overlay.remove();
+          // 启动主内容动画
           document.querySelectorAll('.title, .subtitle, .player-block').forEach(el => {
             el.style.animationPlayState = 'running';
           });
+          // 解锁后才让 footnote 开始计时淡入
+          footnote.classList.add('active');
           if (window.startConfetti) window.startConfetti();
         }, 750);
       } else if (this.value.length >= 3) {
@@ -367,7 +376,6 @@ HTML = """
 </script>
 
 <script>
-  // ========== DOM 元素 ==========
   const playBtn      = document.getElementById('play-btn');
   const iconPlay     = document.getElementById('icon-play');
   const iconPause    = document.getElementById('icon-pause');
@@ -377,7 +385,6 @@ HTML = """
   const progressWrap = document.getElementById('progress-wrap');
   const tooltip      = document.getElementById('time-tooltip');
 
-  // ========== 音频状态 ==========
   let audioCtx      = null;
   let audioBuffer   = null;
   let gainNode      = null;
@@ -396,16 +403,13 @@ HTML = """
   let lastDragPct         = null;
   let visualBufferActive  = false;
   let visualBufferTimeout = null;
+  let animationFrame      = null;
+  let isLoadingAudio      = false;
 
-  let animationFrame = null;
-  let isLoadingAudio = false;
-
-  // ========== 工具函数 ==========
   function fmt(s) {
     if (!isFinite(s) || isNaN(s) || s < 0) return '';
     return Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0');
   }
-
   function showTooltip(pct, t) {
     const label = fmt(t);
     if (!label) return;
@@ -415,12 +419,10 @@ HTML = """
     clearTimeout(tooltipTimer);
     tooltipTimer = setTimeout(() => tooltip.style.opacity='0', 1500);
   }
-
   function updateProgress(pct) {
     fill.style.width    = (pct*100) + '%';
     scrubber.style.left = (pct*100) + '%';
   }
-
   function showLoading(show) {
     if (show) {
       iconPlay.style.display  = 'none';
@@ -440,7 +442,6 @@ HTML = """
     }
   }
 
-  // ========== 下载并解码音频 ==========
   async function loadAudioBuffer() {
     if (audioBuffer) return;
     if (isLoadingAudio) return;
@@ -472,7 +473,6 @@ HTML = """
     }
   }
 
-  // ========== 安全淡入/淡出 ==========
   function fadeOutQuick() {
     if (!gainNode) return;
     const now = audioCtx.currentTime;
@@ -480,7 +480,6 @@ HTML = """
     gainNode.gain.setValueAtTime(gainNode.gain.value, now);
     gainNode.gain.linearRampToValueAtTime(0, now + 0.005);
   }
-
   function fadeInSmooth() {
     if (!gainNode) return;
     const now = audioCtx.currentTime;
@@ -488,15 +487,12 @@ HTML = """
     gainNode.gain.setValueAtTime(0, now);
     gainNode.gain.linearRampToValueAtTime(1.0, now + 0.04);
   }
-
   function muteInstant() {
     if (!gainNode) return;
     const now = audioCtx.currentTime;
     gainNode.gain.cancelScheduledValues(now);
     gainNode.gain.setValueAtTime(0, now);
   }
-
-  // ========== 播放核心 ==========
   function stopSource() {
     if (sourceNode) {
       try { sourceNode.stop(0); } catch(e) {}
@@ -504,7 +500,6 @@ HTML = """
       sourceNode = null;
     }
   }
-
   function playFrom(offset) {
     fadeOutQuick();
     setTimeout(() => {
@@ -537,7 +532,6 @@ HTML = """
       };
     }, 6);
   }
-
   function pause() {
     if (!isPlaying) return;
     const elapsed = audioCtx.currentTime - startTime;
@@ -551,20 +545,17 @@ HTML = """
     }, 6);
   }
 
-  // ========== 拖拽逻辑 ==========
   function progressPct(e) {
     const rect = progressWrap.getBoundingClientRect();
     const x = e.touches ? e.touches[0].clientX : e.clientX;
     return Math.max(0, Math.min(1, (x - rect.left) / rect.width));
   }
-
   function dragMove(e) {
     if (!draggingProgress) return;
     lastDragPct = progressPct(e);
     updateProgress(lastDragPct);
     showTooltip(lastDragPct, lastDragPct * (duration || 0));
   }
-
   function dragStart(e) {
     draggingProgress = true;
     lastDragPct = progressPct(e);
@@ -575,7 +566,6 @@ HTML = """
     clearTimeout(visualBufferTimeout);
     e.preventDefault();
   }
-
   function dragEnd() {
     if (!draggingProgress) return;
     draggingProgress = false;
@@ -605,15 +595,12 @@ HTML = """
   window.addEventListener('mouseup', dragEnd);
   window.addEventListener('touchend', dragEnd);
 
-  // ========== 播放/暂停按钮 ==========
   playBtn.addEventListener('click', async () => {
     if (!audioBuffer) {
       await loadAudioBuffer();
       if (!audioBuffer) return;
     }
-    if (audioCtx.state === 'suspended') {
-      await audioCtx.resume();
-    }
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
     if (isPlaying) {
       pause();
     } else {
@@ -622,14 +609,11 @@ HTML = """
     }
   });
 
-  // ========== 进度条自动更新 ==========
   function updateTimeDisplay() {
     if (!draggingProgress && !visualBufferActive && isPlaying) {
       const elapsed = audioCtx.currentTime - startTime;
       const pos = startOffset + elapsed;
-      if (pos <= duration) {
-        updateProgress(pos / duration);
-      }
+      if (pos <= duration) updateProgress(pos / duration);
     } else if (!isPlaying && !draggingProgress && !visualBufferActive) {
       if (duration) updateProgress(pausedAt / duration);
     }
@@ -637,7 +621,6 @@ HTML = """
   }
   updateTimeDisplay();
 
-  // ========== 可视化 ==========
   const canvas = document.getElementById('viz-canvas');
   const ctx    = canvas.getContext('2d');
   const BAR_COUNT = 40;
@@ -661,15 +644,11 @@ HTML = """
   }
 
   const bars = Array.from({length: BAR_COUNT}, () => ({
-    h: MIN_H,
-    target: MIN_H,
-    speed: 0.18 + Math.random() * 0.08
+    h: MIN_H, target: MIN_H, speed: 0.18 + Math.random() * 0.08
   }));
 
   if (!CanvasRenderingContext2D.prototype.roundRect) {
-    CanvasRenderingContext2D.prototype.roundRect = function(x,y,w,h,r) {
-      this.rect(x,y,w,h);
-    };
+    CanvasRenderingContext2D.prototype.roundRect = function(x,y,w,h,r) { this.rect(x,y,w,h); };
   }
 
   function resizeCanvas() {
@@ -740,5 +719,3 @@ HTML = """
 """
 
 components.html(HTML.replace("__AUDIO_URL__", AUDIO_URL), height=900, scrolling=False)
-
-st.markdown('<p class="footnote-streamlit">Douglas</p>', unsafe_allow_html=True)
