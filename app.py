@@ -43,7 +43,7 @@ if not st.session_state.auth:
     col1, col2, col3 = st.columns([2, 1, 2])
     with col2:
         st.markdown("<div style='height:40vh'></div>", unsafe_allow_html=True)
-        pwd = st.text_input("", type="password", label_visibility="collapsed")
+        pwd = st.text_input("", type="password", placeholder="", label_visibility="collapsed")
         if pwd == "719":
             st.session_state.auth = True
             st.rerun()
