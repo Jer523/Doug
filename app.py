@@ -55,7 +55,7 @@ if not st.session_state.auth:
             margin-bottom: 1rem;
         '>please enter your code</p>
         """, unsafe_allow_html=True)
-        pwd = st.text_input("", type="password", placeholder="", label_visibility="collapsed")
+        pwd = st.text_input("", type="default", placeholder="", label_visibility="collapsed")
         if pwd == "719":
             st.session_state.auth = True
             st.rerun()
