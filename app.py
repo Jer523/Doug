@@ -191,11 +191,13 @@ HTML = """
     pointer-events:none;
   }
 
-  /* footnote：默认隐藏，解锁后才触发动画 */
+  /* footnote：紧贴底部，适配所有屏幕 */
   #footnote {
     position:fixed;
     font-family:'Playfair Display', Georgia, serif;
-    bottom:1.6rem;
+    bottom:0;
+    padding-bottom:1.2rem;
+    padding-bottom:calc(1.2rem + env(safe-area-inset-bottom, 0px));
     left:calc(50% + 9px);
     transform:translateX(-50%);
     font-size:8px;
@@ -243,12 +245,12 @@ HTML = """
   </div>
 </div>
 
-<!-- footnote 在这里，JS 解锁后加 class 触发动画 -->
+<!-- footnote -->
 <p id="footnote">Douglas</p>
 
 <canvas id="confetti-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;"></canvas>
 
-<!-- 密码遮罩：padding-bottom 把内容往上推 -->
+<!-- 密码遮罩 -->
 <div id="auth-overlay" style="
   position:fixed;top:0;left:0;width:100%;height:100%;
   background:#FDFBF7;z-index:99997;
@@ -360,11 +362,9 @@ HTML = """
         overlay.style.opacity = '0';
         setTimeout(() => {
           overlay.remove();
-          // 启动主内容动画
           document.querySelectorAll('.title, .subtitle, .player-block').forEach(el => {
             el.style.animationPlayState = 'running';
           });
-          // 解锁后才让 footnote 开始计时淡入
           footnote.classList.add('active');
           if (window.startConfetti) window.startConfetti();
         }, 750);
@@ -709,6 +709,19 @@ HTML = """
   }
   drawViz();
 
+  // 动态调整 iframe 高度，保证脚注可见（手机适配关键）
+  function setIframeHeight() {
+    try {
+      const iframes = window.parent.document.querySelectorAll('iframe');
+      iframes.forEach(f => {
+        f.style.height = window.innerHeight + 'px';
+      });
+    } catch(e) {}
+  }
+  setIframeHeight();
+  window.addEventListener('resize', setIframeHeight);
+  window.addEventListener('orientationchange', setIframeHeight);
+
   window.addEventListener('beforeunload', () => {
     stopSource();
     if (audioCtx) audioCtx.close();
@@ -718,4 +731,5 @@ HTML = """
 </html>
 """
 
-components.html(HTML.replace("__AUDIO_URL__", AUDIO_URL), height=900, scrolling=False)
+# height=0 避免固定高度裁剪，由 JS 动态调整
+components.html(HTML.replace("__AUDIO_URL__", AUDIO_URL), height=0, scrolling=False)
