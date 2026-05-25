@@ -8,6 +8,48 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+# ── 密码门 ──
+if "auth" not in st.session_state:
+    st.session_state.auth = False
+
+if not st.session_state.auth:
+    st.markdown("""
+    <style>
+    [data-testid="stAppViewContainer"] { background: #FDFBF7 !important; }
+    div[data-testid="stTextInput"] input {
+        background: transparent;
+        border: none;
+        border-bottom: 1px solid #C8BFB0;
+        border-radius: 0;
+        color: #4A4A4A;
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 15px;
+        letter-spacing: 0.3em;
+        text-align: center;
+        box-shadow: none !important;
+        padding: 8px 0;
+    }
+    div[data-testid="stTextInput"] input:focus {
+        border-bottom: 1px solid #9B8B75;
+        outline: none;
+        box-shadow: none !important;
+    }
+    div[data-testid="stTextInput"] { max-width: 120px; margin: 0 auto; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns([2, 1, 2])
+    with col2:
+        st.markdown("<div style='height:40vh'></div>", unsafe_allow_html=True)
+        pwd = st.text_input("", type="password", label_visibility="collapsed")
+        if pwd == "719":
+            st.session_state.auth = True
+            st.rerun()
+        elif pwd:
+            st.stop()
+        else:
+            st.stop()
+
 # 全局背景样式
 st.markdown("""
 <style>
