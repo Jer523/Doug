@@ -1,4 +1,4 @@
-name: Keep Douglas Awake
+name: Keep App Awake
 on:
   schedule:
     - cron: '0 4,10,16,22 * * *'
@@ -8,7 +8,7 @@ jobs:
   wake-up:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Douglas
+      - name: Ping App
         run: |
           pip install selenium -q
           python - <<'EOF'
@@ -21,7 +21,7 @@ jobs:
           options.add_argument('--no-sandbox')
           options.add_argument('--disable-dev-shm-usage')
 
-          print("正在访问 Douglas...")
+          print("正在访问 App...")
           driver = webdriver.Chrome(options=options)
           driver.get("https://douglas48.streamlit.app/")
           time.sleep(10)
