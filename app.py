@@ -201,7 +201,7 @@ HTML = """
     font-family:'Playfair Display', Georgia, serif;
     /* 加入 env(safe-area-inset-bottom) 完美适配刘海屏和底部白条 */
     bottom:calc(4rem + env(safe-area-inset-bottom));
-    left:calc(50% + 9px);
+    left:calc(50% + 10px);
     transform:translateX(-50%);
     font-size:8px;
     color:#C0B8B0;
