@@ -11,8 +11,26 @@ st.set_page_config(
 # ── 密码门 ──
 if "auth" not in st.session_state:
     st.session_state.auth = False
+if "fading" not in st.session_state:
+    st.session_state.fading = False
 
 if not st.session_state.auth:
+    
+    if st.session_state.fading:
+        st.markdown("""
+        <style>
+        [data-testid="stAppViewContainer"] {
+            animation: authFadeOut 0.5s ease-out forwards !important;
+        }
+        @keyframes authFadeOut { from { opacity:1; } to { opacity:0; } }
+        </style>
+        """, unsafe_allow_html=True)
+        import time
+        time.sleep(0.6)
+        st.session_state.auth  = True
+        st.session_state.fading = False
+        st.rerun()
+        
     st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] { background: #FDFBF7 !important; }
@@ -40,7 +58,7 @@ if not st.session_state.auth:
     </style>
     """, unsafe_allow_html=True)
 
-    st.markdown("<div style='height:35vh'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:22vh'></div>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([2, 1, 2])
     with col2:
@@ -57,7 +75,7 @@ if not st.session_state.auth:
         """, unsafe_allow_html=True)
         pwd = st.text_input("", type="default", placeholder="", label_visibility="collapsed")
         if pwd == "719":
-            st.session_state.auth = True
+            st.session_state.fading = True
             st.rerun()
         elif pwd:
             st.stop()
