@@ -20,6 +20,10 @@ html, body,
     margin: 0 !important;
     overflow: hidden !important;
 }
+/* 强制让画框高度等于手机屏幕动态可视高度，解决底部被裁切问题 */
+iframe {
+    height: 100dvh !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -195,7 +199,8 @@ HTML = """
   #footnote {
     position:fixed;
     font-family:'Playfair Display', Georgia, serif;
-    bottom:1.6rem;
+    /* 加入 env(safe-area-inset-bottom) 完美适配刘海屏和底部白条 */
+    bottom:calc(1.6rem + env(safe-area-inset-bottom));
     left:calc(50% + 9px);
     transform:translateX(-50%);
     font-size:8px;
@@ -207,6 +212,7 @@ HTML = """
     white-space:nowrap;
     opacity:0;
   }
+
   #footnote.active {
     animation: footnoteFadeIn 1.2s ease-out 3.0s forwards;
   }
