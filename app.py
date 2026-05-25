@@ -7,29 +7,6 @@ st.set_page_config(
     layout="centered",
     initial_sidebar_state="collapsed",
 )
-
-# ── 密码门 ──
-if "auth" not in st.session_state:
-    st.session_state.auth = False
-if "fading" not in st.session_state:
-    st.session_state.fading = False
-
-if not st.session_state.auth:
-    
-    if st.session_state.fading:
-        st.markdown("""
-        <style>
-        [data-testid="stAppViewContainer"] {
-            animation: authFadeOut 0.5s ease-out forwards !important;
-        }
-        @keyframes authFadeOut { from { opacity:1; } to { opacity:0; } }
-        </style>
-        """, unsafe_allow_html=True)
-        import time
-        time.sleep(0.6)
-        st.session_state.auth  = True
-        st.session_state.fading = False
-        st.rerun()
         
     st.markdown("""
     <style>
@@ -771,6 +748,47 @@ HTML = """
     if (audioCtx) audioCtx.close();
   });
 </script>
+<div id="auth-overlay" style="
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:#FDFBF7;z-index:99997;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  transition:opacity 0.7s ease-out;
+">
+  <p style="
+    font-family:'Playfair Display',Georgia,serif;
+    font-size:11px;font-style:italic;
+    color:#9B9083;letter-spacing:0.08em;
+    margin-bottom:1.2rem;
+  ">please enter your code</p>
+  <input id="auth-input" type="tel" inputmode="numeric" style="
+    background:transparent;
+    border:none;
+    border-bottom:1px solid #C8BFB0;
+    font-family:'Playfair Display',Georgia,serif;
+    font-size:15px;letter-spacing:0.3em;
+    text-align:center;color:#4A4A4A;
+    width:80px;outline:none;padding:8px 0;
+    -webkit-appearance:none;
+  " autocomplete="off" />
+</div>
+
+<script>
+  (function() {
+    const overlay = document.getElementById('auth-overlay');
+    const input   = document.getElementById('auth-input');
+    setTimeout(() => input.focus(), 100);
+    input.addEventListener('input', function() {
+      if (this.value === '719') {
+        overlay.style.opacity = '0';
+        setTimeout(() => overlay.remove(), 750);
+      } else if (this.value.length >= 3) {
+        this.value = '';
+      }
+    });
+  })();
+</script>
+
 </body>
 </html>
 """
