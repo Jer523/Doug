@@ -23,7 +23,7 @@ jobs:
 
           print("正在访问 App...")
           driver = webdriver.Chrome(options=options)
-          driver.get("https://douglas48.streamlit.app/")
+          driver.get("https://doug48.streamlit.app/")
           time.sleep(10)
           driver.quit()
           print("完成")
