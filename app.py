@@ -20,7 +20,7 @@ html, body,
     margin: 0 !important;
     overflow: hidden !important;
 }
-/* 强制让画框高度等于手机屏幕动态可视高度，解决底部被裁切问题 */
+/* 让画框高度等于手机屏幕动态可视高度，防止底部被裁切 */
 iframe {
     height: 100dvh !important;
 }
@@ -195,7 +195,7 @@ HTML = """
     pointer-events:none;
   }
 
-  /* footnote：默认隐藏，解锁后才触发动画 */
+  /* footnote */
   #footnote {
     position:fixed;
     font-family:'Playfair Display', Georgia, serif;
@@ -249,12 +249,12 @@ HTML = """
   </div>
 </div>
 
-<!-- footnote 在这里，JS 解锁后加 class 触发动画 -->
+<!-- footnote -->
 <p id="footnote">Douglas</p>
 
 <canvas id="confetti-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;"></canvas>
 
-<!-- 密码遮罩：padding-bottom 把内容往上推 -->
+<!-- 密码遮罩 -->
 <div id="auth-overlay" style="
   position:fixed;top:0;left:0;width:100%;height:100%;
   background:#FDFBF7;z-index:99997;
@@ -366,11 +366,9 @@ HTML = """
         overlay.style.opacity = '0';
         setTimeout(() => {
           overlay.remove();
-          // 启动主内容动画
           document.querySelectorAll('.title, .subtitle, .player-block').forEach(el => {
             el.style.animationPlayState = 'running';
           });
-          // 解锁后才让 footnote 开始计时淡入
           footnote.classList.add('active');
           if (window.startConfetti) window.startConfetti();
         }, 750);
